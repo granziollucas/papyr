@@ -1,18 +1,25 @@
 # Resumability
 
-Papyr uses SQLite (`state.sqlite`) in the run folder to store:
+Papyr uses SQLite (`state.sqlite`) to persist everything needed for resume and incremental runs.
+
+## Stored state
 - Search parameters
 - Provider pagination cursors
 - Raw and normalized records
 - Download status
 - Failures
 
-Resume flow
-- `papyr resume` accepts a path to `search_params.json`
-- The run folder is determined from that file path
-- State is loaded from SQLite and search continues from the last cursor
+## Resume flow
+1) Run `papyr resume <path to search_params.json>`
+2) Papyr loads the run folder from that path
+3) Provider cursors are read from SQLite and the run continues
 
-Incremental runs
-- Re-running a search in the same folder reuses the same QueryHash
-- Records already seen are skipped by ID
-- Results are re-exported deterministically
+## Incremental runs
+- Re-running a search in the same output folder reuses the QueryHash
+- Already seen record IDs are skipped
+- `results.csv` is re-exported deterministically from all stored records
+
+## Pause/resume/stop
+- Create `.papyr_control` in the output directory
+- Write one of: PAUSE, RESUME, STOP
+- Papyr polls the file during the run

@@ -3,42 +3,46 @@
 Papyr v1 supports Crossref, arXiv, and SSRN. Providers are queried sequentially with conservative rate limits.
 
 ## Crossref
-- Credentials: not required.
-- Search: keyword-based, supports basic year filtering and type filtering.
-- Notes: results are normalized to Papyr's CSV schema.
 
-Official API:
-```
-https://api.crossref.org
-```
+### Setup
+- Required: contact email for polite requests.
+- Optional: user agent string.
+
+Environment keys:
+- `CROSSREF_ENABLED` (1 or 0)
+- `CROSSREF_EMAIL`
+- `CROSSREF_USER_AGENT`
+
+### Capabilities
+- Keyword search
+- Year filter (from/until)
+- Type filter (best-effort)
+
+### Notes
+- Uses Crossref API `mailto` parameter.
+- If skipped, Crossref is disabled but will be prompted on each new search.
 
 ## arXiv
-- Credentials: not required.
-- Search: keyword-based via the arXiv API.
-- Notes: treated as preprints where possible.
 
-Official API:
-```
-https://arxiv.org/help/api
-```
+### Setup
+- No credentials required.
+
+### Capabilities
+- Keyword search via arXiv API.
+
+### Notes
+- Results are treated as preprints.
 
 ## SSRN (disabled by default)
-- Credentials: required only if you have an approved SSRN API or metadata feed.
-- Status: disabled by default. Papyr will not attempt SSRN access unless you explicitly enable it.
-- How to enable:
-  - Set `SSRN_ENABLED=1` in your `.env` file.
-  - Provide any required API credentials or feed URLs as instructed by SSRN Support.
-  - Do not enable SSRN unless the access method is explicitly permitted by SSRN’s terms.
 
-Official SSRN site:
-```
-https://www.ssrn.com
-```
+### Setup
+- SSRN access is disabled unless you explicitly opt in.
+- You must have explicit permission or approved API/feed access from SSRN.
 
-Important
-- SSRN provides RSS feeds (author pages and rankings) and XML metadata feeds for institutions.
-- Requests for SSRN API access or metadata feeds should be submitted to SSRN Support.
-- SSRN’s Terms of Use prohibit automated queries; do not enable SSRN unless you have explicit permission.
-- SSRN’s policy allows re-displaying title/author/abstract for individual documents with a link to SSRN.
-- If SSRN requires scraping for access, do not enable it unless SSRN’s terms explicitly permit it.
-- Papyr never bypasses paywalls or uses unauthorized sources.
+Environment keys:
+- `SSRN_ENABLED` (1 or 0)
+- `SSRN_FEED_URL`
+
+### Notes
+- Do not enable SSRN unless SSRN terms explicitly allow your access method.
+- Papyr will not bypass paywalls or scrape SSRN without permission.

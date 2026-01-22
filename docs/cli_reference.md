@@ -1,38 +1,45 @@
 # CLI Reference
 
 ## papyr init
-Runs the credential setup wizard and environment checks.
+Runs the credential setup wizard and provider checks.
+
+Steps:
+- Crossref polite email
+- SSRN opt-in (disabled by default)
 
 ## papyr new
-Starts a new search wizard.
+Starts the interactive search wizard.
 
 Prompts:
-- Keywords
-- Year range
-- Publication types
-- Search fields
-- Languages
-- Access filter
-- Sort order
-- Limit
-- Download PDFs
+- Keywords (required)
+- Year range (optional)
+- Publication types (optional)
+- Search fields (optional)
+- Language codes or names (optional)
+- Access filter: open / closed / both
+- Sort order (best-effort)
+- Result limit (optional)
+- Download PDFs (yes/no)
 - Output directory
-- Dry-run
+- Dry-run (yes/no)
+
+During runs:
+- A `.papyr_control` file in the output folder can pause/resume/stop.
 
 ## papyr resume
-Resumes a prior search from `search_params.json`.
+Resumes a prior search. You must pass the path to `search_params.json`.
 
 ## papyr config show
-Shows current config (secrets redacted).
+Shows current config with secrets redacted.
 
 ## papyr config init
-Creates a `.env` template file.
+Creates a `.env` template.
 
 ## papyr doctor
 Validates environment, credentials, and connectivity (best-effort).
 
 ## papyr reset-cache
-Resets local cache/state for a run.
+Resets local cache/state for a run (asks for confirmation).
 
 ## papyr export ris
-Generates a RIS file from the current CSV.
+Generates `results.ris` from the current CSV.

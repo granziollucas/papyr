@@ -1,33 +1,37 @@
 # Data Schema
 
-Papyr exports a CSV with fixed columns (always present):
+Papyr exports a CSV with fixed columns. Columns are always present even if blank.
 
-- Authors (format: "Surname, N.; Surname, N.; ...")
+## CSV Columns
+
+- Authors: "Surname, N.; Surname, N.; ..."
 - Title
 - Abstract
-- Origin
+- Origin: provider name
 - Volume
 - Issue
 - Pages
 - Publisher
 - Month
 - Year
-- Type
+- Type: paper/preprint/book_chapter/etc.
 - Keywords
 - Citations
-- OA
-- ID
-- URL
+- OA: true/false/unknown
+- ID: DOI/arXiv/SSRN id
+- URL: official landing page
 - License
-- RetrievedAt
-- QueryHash
-- DuplicateOf
+- RetrievedAt: ISO timestamp
+- QueryHash: stable hash of search parameters
+- DuplicateOf: if deduped
 
-Encoding
-- CSV is comma-separated, latin1 encoded for Excel compatibility.
+## Encoding and delimiter
+- Comma-separated
+- Latin1 encoding for Excel compatibility
+- Proper quoting and escaping for commas/newlines
 
-RIS mapping (best-effort)
-- TY: record type derived from `Type`
+## RIS Mapping (best-effort)
+- TY: derived from Type
 - AU: Authors
 - TI: Title
 - PY: Year
@@ -35,3 +39,8 @@ RIS mapping (best-effort)
 - UR: URL
 - AB: Abstract
 - DO: ID
+
+## Deduplication
+- Titles are normalized (casefold, strip punctuation, collapse whitespace)
+- Duplicates require matching title and ID
+- Crossref is canonical when duplicates are found

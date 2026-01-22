@@ -1,12 +1,18 @@
-# Papyr Docs
+# Papyr Documentation
 
-Welcome to the Papyr documentation.
+Welcome to Papyr. This documentation is the detailed reference for running the CLI, configuring providers, and understanding outputs.
 
-- `quickstart.md` Get running quickly.
-- `cli_reference.md` All commands and options.
-- `providers.md` Provider behaviors and credentials.
-- `data_schema.md` CSV schema and RIS mapping.
-- `resumability.md` How resume and incremental runs work.
+## Contents
+- `quickstart.md` Get up and running with a first search.
+- `cli_reference.md` Full command list and prompt descriptions.
+- `providers.md` Provider setup, capabilities, and limitations.
+- `data_schema.md` CSV column definitions and RIS mapping.
+- `resumability.md` Pause/resume and incremental behavior.
 - `troubleshooting.md` Common issues and fixes.
 - `dev_notes.md` Internal developer notes.
 - `adr/` Architecture decision records.
+
+## Conventions
+- All user-facing strings are en-US.
+- Examples use Windows-friendly paths, but commands are cross-platform.
+- Unless stated otherwise, all output files are created under the chosen output directory.
