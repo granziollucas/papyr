@@ -11,6 +11,8 @@ from papyr.adapters import default_providers
 from papyr.adapters.crossref import CrossrefProvider
 from papyr.adapters.ssrn import SsrnProvider
 from papyr.cli import prompts
+from papyr.core.models import SearchQuery
+from papyr.core.pipeline import run_metasearch
 from papyr.util.config import DEFAULT_ENV_PATH, load_env_file, set_env_value
 
 
@@ -71,7 +73,36 @@ def run_new_wizard(console: Console) -> None:
                 config = load_env_file(DEFAULT_ENV_PATH)
             else:
                 set_env_value(DEFAULT_ENV_PATH, "SSRN_ENABLED", "0")
-    console.print(prompts.NOT_IMPLEMENTED)
+    console.print(prompts.NEW_WIZARD_INTRO)
+    keywords = typer.prompt(prompts.PROMPT_KEYWORDS)
+    year_start = typer.prompt(prompts.PROMPT_YEAR_START, default="")
+    year_end = typer.prompt(prompts.PROMPT_YEAR_END, default="")
+    types_raw = typer.prompt(prompts.PROMPT_TYPES, default="")
+    fields_raw = typer.prompt(prompts.PROMPT_FIELDS, default="")
+    lang_raw = typer.prompt(prompts.PROMPT_LANG, default="")
+    access_filter = typer.prompt(prompts.PROMPT_ACCESS, default="both")
+    sort_order = typer.prompt(prompts.PROMPT_SORT, default="relevance")
+    limit_raw = typer.prompt(prompts.PROMPT_LIMIT, default="")
+    download_pdfs = typer.confirm(prompts.PROMPT_DOWNLOAD, default=False)
+    output_dir = typer.prompt(prompts.PROMPT_OUTPUT)
+    dry_run = typer.confirm(prompts.PROMPT_DRY_RUN, default=False)
+
+    query = SearchQuery(
+        keywords=keywords,
+        year_start=int(year_start) if str(year_start).strip() else None,
+        year_end=int(year_end) if str(year_end).strip() else None,
+        types=[t.strip() for t in types_raw.split(",") if t.strip()],
+        fields_to_search=[f.strip() for f in fields_raw.split(",") if f.strip()],
+        languages=[l.strip() for l in lang_raw.split(",") if l.strip()],
+        access_filter=access_filter,
+        sort_order=sort_order,
+        limit=int(limit_raw) if str(limit_raw).strip() else None,
+        download_pdfs=download_pdfs,
+        output_dir=output_dir,
+        dry_run=dry_run,
+    )
+    run_metasearch(query, providers, config)
+    console.print("Search complete. Results saved to results.csv")
 
 
 def run_resume_wizard(console: Console, params_path: str) -> None:
