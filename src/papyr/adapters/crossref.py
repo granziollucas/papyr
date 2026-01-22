@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import time
 from typing import Iterable
 
 import requests
 
 from papyr.adapters.base import Provider
 from papyr.core.models import PaperRecord, ProviderState, RateLimitPolicy, RawRecord, SearchQuery
+from papyr.core.rate_limit import RateLimiter
 from papyr.util.time import now_iso
 
 
@@ -27,28 +29,49 @@ class CrossrefProvider(Provider):
 
     def search(self, query: SearchQuery, state: ProviderState) -> Iterable[RawRecord]:
         cursor = state.cursor or "*"
-        rows = min(query.limit or 20, 100)
-        params = {
-            "query": query.keywords,
-            "rows": rows,
-            "cursor": cursor,
-        }
-        filters: list[str] = []
-        if query.year_start:
-            filters.append(f"from-pub-date:{query.year_start}-01-01")
-        if query.year_end:
-            filters.append(f"until-pub-date:{query.year_end}-12-31")
-        if query.types:
-            filters.append(f"type:{query.types[0]}")
-        if filters:
-            params["filter"] = ",".join(filters)
-        resp = requests.get("https://api.crossref.org/works", params=params, timeout=30)
-        resp.raise_for_status()
-        payload = resp.json().get("message", {})
-        items = payload.get("items", [])
-        for item in items:
-            doi = item.get("DOI")
-            yield RawRecord(provider=self.name, data=item, record_id=doi)
+        remaining = query.limit
+        limiter = RateLimiter(self.rate_limit_policy())
+        while True:
+            rows = 100
+            if remaining is not None:
+                rows = min(100, remaining)
+                if rows <= 0:
+                    break
+            params = {
+                "query": query.keywords,
+                "rows": rows,
+                "cursor": cursor,
+            }
+            filters: list[str] = []
+            if query.year_start:
+                filters.append(f"from-pub-date:{query.year_start}-01-01")
+            if query.year_end:
+                filters.append(f"until-pub-date:{query.year_end}-12-31")
+            if query.types:
+                filters.append(f"type:{query.types[0]}")
+            if filters:
+                params["filter"] = ",".join(filters)
+            limiter.wait()
+            resp = requests.get("https://api.crossref.org/works", params=params, timeout=30)
+            resp.raise_for_status()
+            payload = resp.json().get("message", {})
+            items = payload.get("items", [])
+            for item in items:
+                doi = item.get("DOI")
+                yield RawRecord(provider=self.name, data=item, record_id=doi)
+                if remaining is not None:
+                    remaining -= 1
+                    if remaining <= 0:
+                        break
+            next_cursor = payload.get("next-cursor")
+            if next_cursor:
+                cursor = next_cursor
+                state.cursor = cursor
+            state.last_request_time = time.time()
+            if not items or not next_cursor:
+                break
+            if remaining is not None and remaining <= 0:
+                break
 
     def normalize(self, raw: RawRecord) -> PaperRecord:
         data = raw.data

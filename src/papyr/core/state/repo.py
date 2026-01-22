@@ -20,6 +20,34 @@ def create_run(conn: sqlite3.Connection, query_hash: str, params: dict[str, Any]
     return int(cur.lastrowid)
 
 
+def get_run_by_hash(conn: sqlite3.Connection, query_hash: str) -> sqlite3.Row | None:
+    """Fetch a run row by query hash."""
+    cur = conn.execute(
+        "SELECT * FROM runs WHERE query_hash=? ORDER BY id DESC LIMIT 1",
+        (query_hash,),
+    )
+    return cur.fetchone()
+
+
+def get_provider_state(
+    conn: sqlite3.Connection, run_id: int, provider: str
+) -> ProviderState | None:
+    """Fetch provider state if available."""
+    cur = conn.execute(
+        "SELECT * FROM provider_state WHERE run_id=? AND provider=?",
+        (run_id, provider),
+    )
+    row = cur.fetchone()
+    if not row:
+        return None
+    extra = json.loads(row["extra_json"]) if row["extra_json"] else {}
+    return ProviderState(
+        cursor=row["cursor"],
+        last_request_time=row["last_request_time"],
+        extra=extra,
+    )
+
+
 def upsert_provider_state(
     conn: sqlite3.Connection,
     run_id: int,
@@ -47,7 +75,7 @@ def upsert_provider_state(
     conn.commit()
 
 
-def upsert_record(
+def insert_record(
     conn: sqlite3.Connection,
     run_id: int,
     provider: str,
@@ -55,9 +83,9 @@ def upsert_record(
     normalized: PaperRecord,
     is_duplicate: bool = False,
     duplicate_of: str | None = None,
-) -> None:
+) -> int:
     """Insert a record (no merge)."""
-    conn.execute(
+    cur = conn.execute(
         """
         INSERT INTO records (
             run_id, provider, record_id, normalized_json, raw_json,
@@ -78,6 +106,7 @@ def upsert_record(
         ),
     )
     conn.commit()
+    return int(cur.lastrowid)
 
 
 def list_records(conn: sqlite3.Connection, run_id: int) -> list[sqlite3.Row]:
@@ -87,6 +116,19 @@ def list_records(conn: sqlite3.Connection, run_id: int) -> list[sqlite3.Row]:
         (run_id,),
     )
     return list(cur.fetchall())
+
+
+def mark_duplicate(
+    conn: sqlite3.Connection,
+    record_row_id: int,
+    duplicate_of: str,
+) -> None:
+    """Mark a record as duplicate."""
+    conn.execute(
+        "UPDATE records SET is_duplicate=1, duplicate_of=?, updated_at=? WHERE id=?",
+        (duplicate_of, now_iso(), record_row_id),
+    )
+    conn.commit()
 
 
 def log_failure(

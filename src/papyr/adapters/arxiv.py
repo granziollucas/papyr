@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Iterable
 from xml.etree import ElementTree as ET
 
@@ -9,6 +10,7 @@ import requests
 
 from papyr.adapters.base import Provider
 from papyr.core.models import PaperRecord, ProviderState, RateLimitPolicy, RawRecord, SearchQuery
+from papyr.core.rate_limit import RateLimiter
 from papyr.util.time import now_iso
 
 
@@ -28,30 +30,53 @@ class ArxivProvider(Provider):
 
     def search(self, query: SearchQuery, state: ProviderState) -> Iterable[RawRecord]:
         start = int(state.cursor or "0")
-        max_results = min(query.limit or 20, 100)
-        search_query = f"all:{query.keywords}"
-        params = {
-            "search_query": search_query,
-            "start": start,
-            "max_results": max_results,
-        }
-        resp = requests.get("http://export.arxiv.org/api/query", params=params, timeout=30)
-        resp.raise_for_status()
-        root = ET.fromstring(resp.text)
-        ns = {"atom": "http://www.w3.org/2005/Atom"}
-        for entry in root.findall("atom:entry", ns):
-            arxiv_id = entry.findtext("atom:id", default="", namespaces=ns)
-            title = entry.findtext("atom:title", default="", namespaces=ns)
-            summary = entry.findtext("atom:summary", default="", namespaces=ns)
-            authors = [a.findtext("atom:name", default="", namespaces=ns) for a in entry.findall("atom:author", ns)]
-            published = entry.findtext("atom:published", default="", namespaces=ns)
-            data = {
-                "title": title.strip(),
-                "summary": summary.strip(),
-                "authors": authors,
-                "published": published,
+        remaining = query.limit
+        limiter = RateLimiter(self.rate_limit_policy())
+        while True:
+            max_results = 100
+            if remaining is not None:
+                max_results = min(100, remaining)
+                if max_results <= 0:
+                    break
+            search_query = f"all:{query.keywords}"
+            params = {
+                "search_query": search_query,
+                "start": start,
+                "max_results": max_results,
             }
-            yield RawRecord(provider=self.name, data=data, record_id=arxiv_id)
+            limiter.wait()
+            resp = requests.get("http://export.arxiv.org/api/query", params=params, timeout=30)
+            resp.raise_for_status()
+            root = ET.fromstring(resp.text)
+            ns = {"atom": "http://www.w3.org/2005/Atom"}
+            entries = root.findall("atom:entry", ns)
+            if not entries:
+                break
+            for entry in entries:
+                arxiv_id = entry.findtext("atom:id", default="", namespaces=ns)
+                title = entry.findtext("atom:title", default="", namespaces=ns)
+                summary = entry.findtext("atom:summary", default="", namespaces=ns)
+                authors = [
+                    a.findtext("atom:name", default="", namespaces=ns)
+                    for a in entry.findall("atom:author", ns)
+                ]
+                published = entry.findtext("atom:published", default="", namespaces=ns)
+                data = {
+                    "title": title.strip(),
+                    "summary": summary.strip(),
+                    "authors": authors,
+                    "published": published,
+                }
+                yield RawRecord(provider=self.name, data=data, record_id=arxiv_id)
+                if remaining is not None:
+                    remaining -= 1
+                    if remaining <= 0:
+                        break
+            start += len(entries)
+            state.cursor = str(start)
+            state.last_request_time = time.time()
+            if remaining is not None and remaining <= 0:
+                break
 
     def normalize(self, raw: RawRecord) -> PaperRecord:
         data = raw.data
