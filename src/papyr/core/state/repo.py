@@ -118,6 +118,15 @@ def list_records(conn: sqlite3.Connection, run_id: int) -> list[sqlite3.Row]:
     return list(cur.fetchall())
 
 
+def list_record_ids(conn: sqlite3.Connection, run_id: int) -> set[str]:
+    """Return record IDs already stored for a run."""
+    cur = conn.execute(
+        "SELECT record_id FROM records WHERE run_id=? AND record_id IS NOT NULL",
+        (run_id,),
+    )
+    return {row["record_id"] for row in cur.fetchall() if row["record_id"]}
+
+
 def mark_duplicate(
     conn: sqlite3.Connection,
     record_row_id: int,
@@ -127,6 +136,27 @@ def mark_duplicate(
     conn.execute(
         "UPDATE records SET is_duplicate=1, duplicate_of=?, updated_at=? WHERE id=?",
         (duplicate_of, now_iso(), record_row_id),
+    )
+    conn.commit()
+
+
+def upsert_download(
+    conn: sqlite3.Connection,
+    run_id: int,
+    record_id: str | None,
+    pdf_url: str,
+    file_path: str | None,
+    status: str,
+    attempts: int,
+    last_error: str | None = None,
+) -> None:
+    """Insert a download row."""
+    conn.execute(
+        """
+        INSERT INTO downloads (run_id, record_id, pdf_url, file_path, status, attempts, last_error, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (run_id, record_id, pdf_url, file_path, status, attempts, last_error, now_iso()),
     )
     conn.commit()
 

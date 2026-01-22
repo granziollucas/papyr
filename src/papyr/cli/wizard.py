@@ -101,6 +101,9 @@ def run_new_wizard(console: Console) -> None:
         output_dir=output_dir,
         dry_run=dry_run,
     )
+    console.print(
+        "Control file: create .papyr_control in the output folder with PAUSE/RESUME/STOP."
+    )
     run_metasearch(query, providers, config)
     console.print("Search complete. Results saved to results.csv")
 

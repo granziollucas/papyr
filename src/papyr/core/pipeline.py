@@ -7,10 +7,13 @@ from pathlib import Path
 from typing import Iterable
 
 from papyr.core.dedup import find_duplicates
+from papyr.core.downloader import download_pdf
 from papyr.core.export_csv import export_csv
 from papyr.core.models import PaperRecord, ProviderState, RawRecord, SearchQuery
 from papyr.core.normalize import normalize_generic
 from papyr.core.state import db, repo
+from papyr.util.control import read_control_command, wait_if_paused, clear_control_command
+from papyr.util.fs import safe_filename
 from papyr.util.hashing import stable_hash
 from papyr.util.time import now_iso
 
@@ -83,21 +86,67 @@ def run_metasearch(
     run_row = repo.get_run_by_hash(conn, query_hash)
     run_id = run_row["id"] if run_row else repo.create_run(conn, query_hash, query.model_dump())
 
+    existing_ids = repo.list_record_ids(conn, run_id)
     all_records: list[PaperRecord] = []
     record_row_ids: dict[int, int] = {}
+    control_path = output_dir / ".papyr_control"
 
     for provider in providers:
         if not provider.is_configured(config):
             continue
+        cmd = read_control_command(control_path)
+        if cmd == "STOP":
+            clear_control_command(control_path)
+            break
+        if cmd == "PAUSE":
+            if not wait_if_paused(control_path):
+                break
         state = repo.get_provider_state(conn, run_id, provider.name) or ProviderState()
         for raw in provider.search(query, state):
+            cmd = read_control_command(control_path)
+            if cmd == "STOP":
+                clear_control_command(control_path)
+                break
+            if cmd == "PAUSE":
+                if not wait_if_paused(control_path):
+                    break
+            if raw.record_id and raw.record_id in existing_ids:
+                continue
             record = provider.normalize(raw)
             record.query_hash = query_hash
             record.retrieved_at = now_iso()
             all_records.append(record)
             row_id = repo.insert_record(conn, run_id, provider.name, raw, record)
             record_row_ids[id(record)] = row_id
+            if raw.record_id:
+                existing_ids.add(raw.record_id)
+            if query.download_pdfs and not query.dry_run:
+                urls = provider.get_official_urls(record)
+                pdf_url = urls.get("pdf_url") if urls else None
+                if pdf_url:
+                    filename = safe_filename(record.title, record.id or record.url)
+                    dest = output_dir / "files" / filename
+                    result = download_pdf(pdf_url, dest)
+                    status = "ok" if result.ok else "failed"
+                    repo.upsert_download(
+                        conn,
+                        run_id,
+                        record.id or None,
+                        pdf_url,
+                        str(dest) if result.ok else None,
+                        status,
+                        result.attempts,
+                        None if result.ok else result.message,
+                    )
         repo.upsert_provider_state(conn, run_id, provider.name, state)
+
+    all_rows = repo.list_records(conn, run_id)
+    all_records = []
+    record_row_ids = {}
+    for row in all_rows:
+        record = PaperRecord.model_validate_json(row["normalized_json"])
+        all_records.append(record)
+        record_row_ids[id(record)] = int(row["id"])
 
     canonical, duplicates = deduplicate(all_records)
     for duplicate, canonical_record, _reason in duplicates:
