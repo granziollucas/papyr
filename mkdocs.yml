@@ -1,0 +1,20 @@
+site_name: Papyr
+site_description: Papyr CLI documentation
+site_url: https://example.invalid
+repo_url: https://github.com/granziollucas/papyr
+nav:
+  - Home: index.md
+  - Quickstart: quickstart.md
+  - CLI Reference: cli_reference.md
+  - Providers: providers.md
+  - Data Schema: data_schema.md
+  - Resumability: resumability.md
+  - Troubleshooting: troubleshooting.md
+  - Dev Notes: dev_notes.md
+theme:
+  name: mkdocs
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true

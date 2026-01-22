@@ -23,6 +23,11 @@ papyr init
 papyr new
 ```
 
+Docs site (MkDocs)
+```bash
+mkdocs serve
+```
+
 Key commands
 - `papyr init` initialize credentials and providers
 - `papyr new` start a new search
