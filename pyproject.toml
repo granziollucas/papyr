@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling>=1.24.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "papyr"
+version = "0.1.0"
+description = "CLI tool to search academic works and export metadata"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+  { name = "Papyr Contributors" }
+]
+keywords = ["academic", "cli", "metadata", "search"]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent"
+]
+dependencies = [
+  "typer>=0.12.0",
+  "rich>=13.7.1",
+  "pydantic>=2.7.0",
+  "requests>=2.32.0"
+]
+
+[project.scripts]
+papyr = "papyr.cli.app:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/papyr"]

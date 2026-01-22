@@ -1,3 +1,5 @@
+#Description
+Papys helps students and researchers find relevant literature faster. Crawl Crossref, arXiv and SSRN, export a detailed CSV with official links, and filter by language, years, publication type, and Open Access (OA/closed). Optional PDF auto-download when available. 
 
 ## Sources (planned)
 - Crossref
