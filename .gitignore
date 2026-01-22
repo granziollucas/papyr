@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+ECHO est  ativado.
+# Virtualenv
+.venv/
+venv/
+ENV/
+env/
+ECHO est  ativado.
+# Packaging / build
+build/
+dist/
+*.egg-info/
+.eggs/
+ECHO est  ativado.
+# Tests / tools
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+ECHO est  ativado.
+# Jupyter
+.ipynb_checkpoints/
+ECHO est  ativado.
+# IDEs
+.vscode/
+.idea/
+ECHO est  ativado.
+# OS
+Thumbs.db
+Desktop.ini
+ECHO est  ativado.
+# Secrets
+.env
+.env.*
+*.key
+*.pem
