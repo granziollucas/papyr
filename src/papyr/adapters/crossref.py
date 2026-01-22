@@ -15,14 +15,19 @@ from papyr.util.time import now_iso
 
 class CrossrefProvider(Provider):
     name = "Crossref"
-    requires_credentials = False
-    credential_fields: list[str] = []
+    requires_credentials = True
+    credential_fields: list[str] = ["CROSSREF_EMAIL", "CROSSREF_USER_AGENT"]
 
     def is_configured(self, config: dict[str, str]) -> bool:
-        return True
+        if config.get("CROSSREF_ENABLED", "1") == "0":
+            return False
+        return bool(config.get("CROSSREF_EMAIL"))
 
     def setup_instructions(self) -> list[str]:
-        return ["No credentials required for Crossref API."]
+        return [
+            "Crossref requires polite requests with a contact email.",
+            "Provide a contact email and optional user agent string.",
+        ]
 
     def rate_limit_policy(self) -> RateLimitPolicy:
         return RateLimitPolicy(min_delay_seconds=1.0)
@@ -51,8 +56,20 @@ class CrossrefProvider(Provider):
                 filters.append(f"type:{query.types[0]}")
             if filters:
                 params["filter"] = ",".join(filters)
+            email = query.extra.get("crossref_email") if hasattr(query, "extra") else None
+            if email:
+                params["mailto"] = email
             limiter.wait()
-            resp = requests.get("https://api.crossref.org/works", params=params, timeout=30)
+            headers = {}
+            user_agent = query.extra.get("crossref_user_agent") if hasattr(query, "extra") else None
+            if user_agent:
+                headers["User-Agent"] = user_agent
+            resp = requests.get(
+                "https://api.crossref.org/works",
+                params=params,
+                headers=headers,
+                timeout=30,
+            )
             resp.raise_for_status()
             payload = resp.json().get("message", {})
             items = payload.get("items", [])

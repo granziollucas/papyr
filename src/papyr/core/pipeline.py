@@ -71,6 +71,12 @@ def run_metasearch(
     params_path.write_text(query.model_dump_json(indent=2), encoding="utf-8")
 
     query_hash = stable_hash(query.model_dump())
+    if not query.extra:
+        query.extra = {}
+    if config.get("CROSSREF_EMAIL"):
+        query.extra["crossref_email"] = config.get("CROSSREF_EMAIL", "")
+    if config.get("CROSSREF_USER_AGENT"):
+        query.extra["crossref_user_agent"] = config.get("CROSSREF_USER_AGENT", "")
     conn = db.connect(output_dir / "state.sqlite")
     db.init_db(conn)
 
@@ -81,7 +87,7 @@ def run_metasearch(
     record_row_ids: dict[int, int] = {}
 
     for provider in providers:
-        if provider.requires_credentials and not provider.is_configured(config):
+        if not provider.is_configured(config):
             continue
         state = repo.get_provider_state(conn, run_id, provider.name) or ProviderState()
         for raw in provider.search(query, state):

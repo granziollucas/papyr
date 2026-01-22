@@ -11,7 +11,7 @@ from papyr.core.models import PaperRecord, ProviderState, RateLimitPolicy, RawRe
 class SsrnProvider(Provider):
     name = "SSRN"
     requires_credentials = False
-    credential_fields: list[str] = []
+    credential_fields: list[str] = ["SSRN_ENABLED", "SSRN_FEED_URL"]
 
     def is_configured(self, config: dict[str, str]) -> bool:
         return config.get("SSRN_ENABLED", "0") == "1"
@@ -20,6 +20,7 @@ class SsrnProvider(Provider):
         return [
             "SSRN adapter is disabled by default.",
             "Enable by setting SSRN_ENABLED=1 in your .env if you accept SSRN terms.",
+            "If you have SSRN-provided API or feed access, set SSRN_FEED_URL accordingly.",
         ]
 
     def rate_limit_policy(self) -> RateLimitPolicy:

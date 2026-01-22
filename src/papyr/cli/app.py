@@ -6,6 +6,7 @@ import typer
 from rich.console import Console
 
 from papyr.cli import wizard
+from papyr.util.config import DEFAULT_ENV_PATH, load_env_file, write_env_file
 
 app = typer.Typer(add_completion=False, help="Papyr CLI")
 config_app = typer.Typer(help="Config commands")
@@ -38,13 +39,32 @@ def resume_command(params_path: str = typer.Argument(..., help="Path to search_p
 @config_app.command("show")
 def config_show() -> None:
     """Display current config (redact secrets)."""
-    console.print("Not implemented yet.")
+    config = load_env_file(DEFAULT_ENV_PATH)
+    if not config:
+        console.print("No .env found.")
+        return
+    redacted = {}
+    for key, value in config.items():
+        if key.endswith("_KEY") or key.endswith("_TOKEN") or key.endswith("_PASSWORD"):
+            redacted[key] = "****"
+        else:
+            redacted[key] = value
+    for key in sorted(redacted.keys()):
+        console.print(f"{key}={redacted[key]}")
 
 
 @config_app.command("init")
 def config_init() -> None:
     """Create config template file."""
-    console.print("Not implemented yet.")
+    template = {
+        "CROSSREF_ENABLED": "1",
+        "CROSSREF_EMAIL": "",
+        "CROSSREF_USER_AGENT": "",
+        "SSRN_ENABLED": "0",
+        "SSRN_FEED_URL": "",
+    }
+    write_env_file(DEFAULT_ENV_PATH, template)
+    console.print("Created .env template.")
 
 
 @app.command("doctor")
