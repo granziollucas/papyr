@@ -1,25 +1,34 @@
-#Description
-Papys helps students and researchers find relevant literature faster. Crawl Crossref, arXiv and SSRN, export a detailed CSV with official links, and filter by language, years, publication type, and Open Access (OA/closed). Optional PDF auto-download when available. 
+# Papyr
 
-## Sources (planned)
-- Crossref
-- arXiv
-- SSRN
+Papyr is a Python CLI that searches academic works across multiple sources and exports a single CSV with official access links. It can optionally download legitimate PDFs when explicitly enabled.
 
-## Key features
-- Keyword-based search
-- Filters: language, year range, publication type, and access mode (open/closed)
-- Export: detailed CSV with metadata + official URLs
-- Optional: auto-download available PDFs (when permitted/available)
+What it does
+- Searches Crossref, arXiv, and SSRN (SSRN disabled by default).
+- Exports a CSV with a fixed schema and official URLs.
+- Supports resumable and incremental runs via SQLite state.
 
-## Status
-Early development (CLI-first). A simple frontend may be added later.
+What it does NOT do
+- It does not bypass paywalls or use unauthorized sources.
+- It does not scrape SSRN without explicit permission.
+- It does not use LLM features in v1.
 
-## Quick start (planned)
+Install
 ```bash
-# pip install -r requirements.txt
-# python -m papyr --help
+pip install -e .
 ```
 
-## License
-See LICENSE.
+Quick start
+```bash
+papyr init
+papyr new
+```
+
+Key commands
+- `papyr init` initialize credentials and providers
+- `papyr new` start a new search
+- `papyr resume` resume a prior search
+- `papyr doctor` check environment
+- `papyr export ris` export RIS from CSV
+
+License
+See `LICENSE`.

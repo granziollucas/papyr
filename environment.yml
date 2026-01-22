@@ -1,0 +1,11 @@
+name: papyr
+channels:
+  - conda-forge
+dependencies:
+  - python>=3.11
+  - pip
+  - pip:
+      - typer>=0.12.0
+      - rich>=13.7.1
+      - pydantic>=2.7.0
+      - requests>=2.32.0
