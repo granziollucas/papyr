@@ -23,6 +23,10 @@ papyr init
 papyr new
 ```
 
+Launcher scripts
+- Windows: `papyr-setup.bat` installs requirements, then run `papyr.bat`
+- macOS/Linux: `papyr-setup.sh` installs requirements, then run `papyr.sh`
+
 Docs site (MkDocs)
 ```bash
 mkdocs serve
