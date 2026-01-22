@@ -32,12 +32,15 @@ class ArxivProvider(Provider):
         start = int(state.cursor or "0")
         remaining = query.limit
         limiter = RateLimiter(self.rate_limit_policy())
+        max_retries = 4
         while True:
             max_results = 100
             if remaining is not None:
                 max_results = min(100, remaining)
                 if max_results <= 0:
                     break
+            if max_results > 50:
+                max_results = 50
             search_query = f"all:{query.keywords}"
             params = {
                 "search_query": search_query,
@@ -45,8 +48,30 @@ class ArxivProvider(Provider):
                 "max_results": max_results,
             }
             limiter.wait()
-            resp = requests.get("http://export.arxiv.org/api/query", params=params, timeout=30)
-            resp.raise_for_status()
+            last_exc: Exception | None = None
+            for attempt in range(1, max_retries + 1):
+                try:
+                    resp = requests.get(
+                        "https://export.arxiv.org/api/query",
+                        params=params,
+                        timeout=45,
+                    )
+                    if resp.status_code == 429 or resp.status_code >= 500:
+                        backoff = 3.0 * attempt
+                        time.sleep(backoff)
+                        last_exc = requests.HTTPError(
+                            f"{resp.status_code} error for url: {resp.url}", response=resp
+                        )
+                        continue
+                    resp.raise_for_status()
+                    last_exc = None
+                    break
+                except (requests.Timeout, requests.ConnectionError) as exc:
+                    backoff = 3.0 * attempt
+                    time.sleep(backoff)
+                    last_exc = exc
+            if last_exc:
+                raise last_exc
             root = ET.fromstring(resp.text)
             ns = {"atom": "http://www.w3.org/2005/Atom"}
             entries = root.findall("atom:entry", ns)

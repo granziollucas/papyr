@@ -5,7 +5,8 @@ from __future__ import annotations
 import typer
 from rich.console import Console
 
-from papyr.cli import wizard
+from papyr.cli import prompts, wizard
+from papyr.adapters import default_providers
 from papyr.util.config import DEFAULT_ENV_PATH, load_env_file, write_env_file
 
 app = typer.Typer(add_completion=False, help="Papyr CLI")
@@ -22,6 +23,16 @@ console = Console()
 def init_command() -> None:
     """Credential setup wizard + doctor checks."""
     wizard.run_init_wizard(console)
+    _print_credential_status(show_fix=False)
+    _print_next_choices()
+
+
+@app.command("bootstrap")
+def bootstrap_command() -> None:
+    """Credential check and guided next steps."""
+    wizard.run_bootstrap(console)
+    _print_credential_status(show_fix=True)
+    _print_next_choices()
 
 
 @app.command("new")
@@ -31,8 +42,17 @@ def new_command() -> None:
 
 
 @app.command("resume")
-def resume_command(params_path: str = typer.Argument(..., help="Path to search_params.json")) -> None:
+def resume_command(
+    params_path: str | None = typer.Argument(
+        None,
+        help="Path to search_params.json",
+    )
+) -> None:
     """Resume a prior search."""
+    if not params_path:
+        params_path = typer.prompt(
+            "Step 1/1: Path to search_params.json. Example: C:\\Papyr\\runs\\climate\\search_params.json"
+        )
     wizard.run_resume_wizard(console, params_path)
 
 
@@ -70,7 +90,9 @@ def config_init() -> None:
 @app.command("doctor")
 def doctor() -> None:
     """Validate environment, credentials, connectivity (best-effort)."""
-    console.print("Not implemented yet.")
+    console.print(prompts.DOCTOR_TITLE)
+    _print_credential_status(show_fix=True)
+    _print_next_choices()
 
 
 @app.command("reset-cache")
@@ -83,3 +105,38 @@ def reset_cache() -> None:
 def export_ris() -> None:
     """Generate RIS file from current run (CSV-driven)."""
     console.print("Not implemented yet.")
+
+
+def _credential_report() -> tuple[bool, list[str]]:
+    config = load_env_file(DEFAULT_ENV_PATH)
+    providers = default_providers()
+    ok = True
+    lines: list[str] = []
+    for provider in providers:
+        if provider.requires_credentials:
+            if provider.is_configured(config):
+                lines.append(f"{provider.name}: ok")
+            else:
+                ok = False
+                lines.append(f"{provider.name}: missing credentials")
+        else:
+            if provider.is_configured(config):
+                lines.append(f"{provider.name}: enabled")
+            else:
+                lines.append(f"{provider.name}: disabled (optional)")
+    return ok, lines
+
+
+def _print_credential_status(show_fix: bool) -> bool:
+    ok, lines = _credential_report()
+    console.print("Credential check:")
+    for line in lines:
+        console.print(f"  {line}")
+    if not ok and show_fix:
+        console.print("Fix: run papyr init to configure missing credentials.")
+    return ok
+
+
+def _print_next_choices() -> None:
+    for line in prompts.BOOTSTRAP_CHOICES:
+        console.print(line)

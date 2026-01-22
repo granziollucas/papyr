@@ -26,6 +26,7 @@ papyr new
 Launcher scripts
 - Windows: `papyr-setup.bat` installs requirements, then run `papyr.bat`
 - macOS/Linux: `papyr-setup.sh` installs requirements, then run `papyr.sh`
+- Run a launcher with no arguments to enter a simple shell (`papyr>`) and execute multiple commands.
 
 Docs site (MkDocs)
 ```bash
@@ -36,7 +37,7 @@ Key commands
 - `papyr init` initialize credentials and providers
 - `papyr new` start a new search
 - `papyr resume` resume a prior search
-- `papyr doctor` check environment
+- `papyr doctor` check credentials and show a brief guided next-steps list
 - `papyr export ris` export RIS from CSV
 
 License

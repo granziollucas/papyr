@@ -36,6 +36,17 @@ You will be prompted for:
 papyr resume <path to search_params.json>
 ```
 
+## Optional launcher shell
+If you run a launcher with no arguments, it opens a simple shell so you can run multiple commands without reopening the terminal.
+
+Examples:
+```bash
+papyr.bat
+papyr> init
+papyr> new
+papyr> exit
+```
+
 ## 4) Export RIS (optional)
 ```bash
 papyr export ris

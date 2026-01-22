@@ -51,8 +51,33 @@ def run_init_wizard(console: Console) -> None:
     console.print(prompts.INIT_TITLE)
     _configure_crossref(console)
     _configure_ssrn(console)
-    for line in prompts.NEXT_COMMANDS:
-        console.print(line)
+
+
+def _configure_missing_providers(console: Console) -> None:
+    config = load_env_file(DEFAULT_ENV_PATH)
+    providers = default_providers()
+    for provider in providers:
+        if provider.requires_credentials and not provider.is_configured(config):
+            if isinstance(provider, CrossrefProvider):
+                if typer.confirm("Crossref is not configured. Configure now?", default=True):
+                    _configure_crossref(console)
+                else:
+                    set_env_value(DEFAULT_ENV_PATH, "CROSSREF_ENABLED", "0")
+            config = load_env_file(DEFAULT_ENV_PATH)
+        if isinstance(provider, SsrnProvider) and not provider.is_configured(config):
+            if typer.confirm("SSRN is disabled (optional). Configure now?", default=False):
+                _configure_ssrn(console)
+                config = load_env_file(DEFAULT_ENV_PATH)
+
+
+def run_bootstrap(console: Console) -> None:
+    """Check credentials and optionally configure missing providers."""
+    console.print(prompts.BOOTSTRAP_TITLE)
+    if typer.confirm(prompts.BOOTSTRAP_SKIP_PROMPT, default=False):
+        console.print("Skipped credential setup.")
+        return
+    _configure_missing_providers(console)
+    console.print("Credential check complete.")
 
 
 def run_new_wizard(console: Console) -> None:
@@ -104,7 +129,7 @@ def run_new_wizard(console: Console) -> None:
     console.print(
         "Control file: create .papyr_control in the output folder with PAUSE/RESUME/STOP."
     )
-    run_metasearch(query, providers, config)
+    run_metasearch(query, providers, config, console=console)
     console.print("Search complete. Results saved to results.csv")
 
 

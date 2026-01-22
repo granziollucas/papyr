@@ -1,5 +1,16 @@
 # CLI Reference
 
+## Launcher shell (papyr.bat / papyr.sh / papyr.command)
+If you run a launcher with no arguments, it starts a simple interactive shell:
+
+- Prompt: `papyr>`
+- Exit with `exit` or `quit`
+- `help` prints example commands
+
+Before the prompt, Papyr runs a credential check and offers to configure any missing providers. You can skip this step. It then shows a brief `new`/`resume` hint; each command prompts step-by-step.
+
+You can also pass a command directly, e.g., `papyr.bat init`.
+
 ## papyr init
 Runs the credential setup wizard and provider checks.
 
@@ -25,6 +36,7 @@ Prompts:
 
 During runs:
 - A `.papyr_control` file in the output folder can pause/resume/stop.
+- A progress bar with ETA shows overall search progress (ETA is most accurate when a limit is set).
 
 ## papyr resume
 Resumes a prior search. You must pass the path to `search_params.json`.
@@ -36,7 +48,7 @@ Shows current config with secrets redacted.
 Creates a `.env` template.
 
 ## papyr doctor
-Validates environment, credentials, and connectivity (best-effort).
+Checks credentials and prints a brief step-by-step guide for `new` and `resume` if everything is configured.
 
 ## papyr reset-cache
 Resets local cache/state for a run (asks for confirmation).
