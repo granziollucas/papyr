@@ -170,11 +170,16 @@ def run_resume_wizard(console: Console, params_path: str) -> None:
     params_text = resolved.read_text(encoding="utf-8")
     query = SearchQuery.model_validate_json(params_text)
     original_hash = stable_hash(query.model_dump())
-    _maybe_edit_resume_query(query)
+    run_id = _resolve_run_id(query, original_hash)
+    existing_count = _count_existing_records(query, run_id)
+    do_search, desired_limit, downloads_requested = _maybe_edit_resume_query(query, existing_count)
     resolved.write_text(query.model_dump_json(indent=2), encoding="utf-8")
     providers = default_providers()
-    run_id = _resolve_run_id(query, original_hash)
-    if typer.confirm("Check existing records for missing PDFs and download now?", default=False):
+    if downloads_requested is None:
+        downloads_requested = typer.confirm(
+            "Check existing records for missing PDFs and download now?", default=False
+        )
+    if downloads_requested:
         if not query.download_pdfs:
             if typer.confirm("Downloads are disabled in this run. Enable downloads now?", default=True):
                 query.download_pdfs = True
@@ -183,7 +188,27 @@ def run_resume_wizard(console: Console, params_path: str) -> None:
             _download_missing_pdfs(console, query, providers, run_id)
     console.print("Keyboard: p=pause, r=resume, s=save+exit, q=stop.")
     console.print("Control file fallback: .papyr_control with PAUSE/RESUME/STOP/SAVE_EXIT in output folder.")
-    _, _exit_reason = run_metasearch(query, providers, config, console=console, resume_run_id=run_id)
+    if do_search and desired_limit is not None:
+        max_new = max(0, desired_limit - existing_count)
+    else:
+        max_new = None
+        if not do_search:
+            if os.getenv("PAPYR_SHELL"):
+                for line in prompts.BOOTSTRAP_CHOICES:
+                    console.print(line)
+                console.print(prompts.SHELL_HINT)
+            output_name = "results.tsv" if query.output_format == "tsv" else "results.csv"
+            console.print(f"Search complete. Results saved to {output_name}")
+            return
+    _, _exit_reason = run_metasearch(
+        query,
+        providers,
+        config,
+        console=console,
+        resume_run_id=run_id,
+        max_new=max_new,
+        append_new_only=True,
+    )
     if os.getenv("PAPYR_SHELL"):
         for line in prompts.BOOTSTRAP_CHOICES:
             console.print(line)
@@ -202,9 +227,11 @@ def _resolve_run_id(query: SearchQuery, original_hash: str) -> int:
     return repo.create_run(conn, stable_hash(query.model_dump()), query.model_dump())
 
 
-def _maybe_edit_resume_query(query: SearchQuery) -> None:
+def _maybe_edit_resume_query(
+    query: SearchQuery, existing_count: int
+) -> tuple[bool, int | None, bool | None]:
     if not typer.confirm("Edit search parameters before resuming?", default=False):
-        return
+        return True, query.limit, None
     keywords = typer.prompt("Keywords", default=query.keywords)
     year_start = typer.prompt("Start year (optional)", default=str(query.year_start or ""))
     year_end = typer.prompt("End year (optional)", default=str(query.year_end or ""))
@@ -213,7 +240,10 @@ def _maybe_edit_resume_query(query: SearchQuery) -> None:
     lang_raw = typer.prompt("Language codes or names (comma-separated)", default=",".join(query.languages))
     access_filter = typer.prompt("Access filter: open/closed/both", default=query.access_filter)
     sort_order = typer.prompt("Sort order", default=query.sort_order)
-    limit_raw = typer.prompt("Result limit (optional)", default=str(query.limit or ""))
+    limit_prompt = (
+        f"Result limit (optional). Leave blank to skip new search; current: {query.limit or ''}"
+    )
+    limit_raw = typer.prompt(limit_prompt, default="")
     download_pdfs = typer.confirm("Download PDFs?", default=query.download_pdfs)
     output_format = typer.prompt("Output format: csv or tsv", default=query.output_format).strip().lower()
     if output_format not in {"csv", "tsv"}:
@@ -227,9 +257,23 @@ def _maybe_edit_resume_query(query: SearchQuery) -> None:
     query.languages = [l.strip() for l in lang_raw.split(",") if l.strip()]
     query.access_filter = access_filter
     query.sort_order = sort_order
-    query.limit = int(limit_raw) if str(limit_raw).strip() else None
     query.download_pdfs = download_pdfs
     query.output_format = output_format
+
+    if not str(limit_raw).strip():
+        return False, None, None
+    limit_value = int(limit_raw)
+    query.limit = limit_value
+    if limit_value <= existing_count:
+        return False, limit_value, None
+    return True, limit_value, None
+
+
+def _count_existing_records(query: SearchQuery, run_id: int) -> int:
+    output_dir = Path(query.output_dir)
+    conn = db.connect(output_dir / "state.sqlite")
+    db.init_db(conn)
+    return repo.count_records(conn, run_id)
 
 
 def _download_missing_pdfs(
@@ -259,6 +303,20 @@ def _download_missing_pdfs(
             continue
         filename = safe_filename(record.title, record.id or record.url)
         dest = files_dir / filename
+        if dest.exists():
+            repo.upsert_download(
+                conn,
+                run_id,
+                record.id or None,
+                pdf_url,
+                str(dest),
+                "ok",
+                0,
+                None,
+            )
+            if record.id:
+                downloaded_ids.add(record.id)
+            continue
         result = download_pdf(pdf_url, dest)
         status = "ok" if result.ok else "failed"
         repo.upsert_download(

@@ -9,10 +9,12 @@ from papyr.core.export_csv import CSV_COLUMNS, _csv_value
 from papyr.core.models import PaperRecord
 
 
-def export_tsv(records: list[PaperRecord], path: Path) -> None:
+def export_tsv(records: list[PaperRecord], path: Path, append: bool = False) -> None:
     """Write TSV in UTF-8 with BOM for Excel friendliness."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8-sig", newline="") as handle:
+    mode = "a" if append and path.exists() else "w"
+    write_header = mode == "w"
+    with path.open(mode, encoding="utf-8-sig", newline="") as handle:
         writer = csv.DictWriter(
             handle,
             fieldnames=CSV_COLUMNS,
@@ -21,7 +23,8 @@ def export_tsv(records: list[PaperRecord], path: Path) -> None:
             doublequote=True,
             lineterminator="\n",
         )
-        writer.writeheader()
+        if write_header:
+            writer.writeheader()
         for record in records:
             writer.writerow(
                 {

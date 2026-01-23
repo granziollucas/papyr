@@ -54,6 +54,17 @@ def export_results(records: list[PaperRecord], output_dir: Path, output_format: 
     return path
 
 
+def append_results(records: list[PaperRecord], output_dir: Path, output_format: str) -> Path:
+    """Append results in the requested format and return its path."""
+    if output_format == "tsv":
+        path = output_dir / "results.tsv"
+        export_tsv(records, path, append=True)
+        return path
+    path = output_dir / "results.csv"
+    export_csv(records, path, append=True)
+    return path
+
+
 def deduplicate(records: list[PaperRecord]) -> tuple[list[PaperRecord], list[tuple[PaperRecord, PaperRecord, str]]]:
     """Return canonical records and duplicate pairs."""
     duplicates = find_duplicates(records)
@@ -79,6 +90,8 @@ def run_metasearch(
     config: dict[str, str],
     console: Console | None = None,
     resume_run_id: int | None = None,
+    max_new: int | None = None,
+    append_new_only: bool = False,
 ) -> tuple[list[PaperRecord], str]:
     """Run sequential provider searches with persistence and CSV export."""
     console = console or Console()
@@ -111,15 +124,18 @@ def run_metasearch(
         run_id = run_row["id"] if run_row else repo.create_run(conn, query_hash, query.model_dump())
 
     existing_ids = repo.list_record_ids(conn, run_id)
+    downloaded_ids = repo.list_downloaded_ids(conn, run_id)
     all_records: list[PaperRecord] = []
     record_row_ids: dict[int, int] = {}
+    new_row_ids: set[int] = set()
     control_path = output_dir / ".papyr_control"
     keyboard = KeyboardControl()
     keyboard.start()
     stop_requested = False
     exit_reason = "completed"
+    new_count = 0
 
-    total = query.limit if query.limit is not None else None
+    total = max_new if max_new is not None else query.limit
     progress_columns = [
         SpinnerColumn(),
         TextColumn("{task.description}"),
@@ -185,14 +201,32 @@ def run_metasearch(
                         all_records.append(record)
                         row_id = repo.insert_record(conn, run_id, provider.name, raw, record)
                         record_row_ids[id(record)] = row_id
+                        new_row_ids.add(row_id)
                         if raw.record_id:
                             existing_ids.add(raw.record_id)
+                        new_count += 1
                         if query.download_pdfs and not query.dry_run:
                             urls = provider.get_official_urls(record)
                             pdf_url = urls.get("pdf_url") if urls else None
                             if pdf_url:
                                 filename = safe_filename(record.title, record.id or record.url)
                                 dest = output_dir / "files" / filename
+                                if record.id and record.id in downloaded_ids:
+                                    continue
+                                if dest.exists():
+                                    repo.upsert_download(
+                                        conn,
+                                        run_id,
+                                        record.id or None,
+                                        pdf_url,
+                                        str(dest),
+                                        "ok",
+                                        0,
+                                        None,
+                                    )
+                                    if record.id:
+                                        downloaded_ids.add(record.id)
+                                    continue
                                 result = download_pdf(pdf_url, dest)
                                 status = "ok" if result.ok else "failed"
                                 repo.upsert_download(
@@ -205,6 +239,12 @@ def run_metasearch(
                                     result.attempts,
                                     None if result.ok else result.message,
                                 )
+                                if result.ok and record.id:
+                                    downloaded_ids.add(record.id)
+                        if max_new is not None and new_count >= max_new:
+                            stop_requested = True
+                            exit_reason = "completed"
+                            break
                 except Exception as exc:  # noqa: BLE001 - log and continue per resilience requirements
                     message = str(exc) or "Provider search failed."
                     stack = traceback.format_exc()
@@ -237,10 +277,12 @@ def run_metasearch(
     all_rows = repo.list_records(conn, run_id)
     all_records = []
     record_row_ids = {}
+    row_id_to_record: dict[int, PaperRecord] = {}
     for row in all_rows:
         record = PaperRecord.model_validate_json(row["normalized_json"])
         all_records.append(record)
         record_row_ids[id(record)] = int(row["id"])
+        row_id_to_record[int(row["id"])] = record
 
     canonical, duplicates = deduplicate(all_records)
     for duplicate, canonical_record, _reason in duplicates:
@@ -251,7 +293,16 @@ def run_metasearch(
             if row_id:
                 repo.mark_duplicate(conn, row_id, duplicate_of)
 
-    export_results(canonical, output_dir, query.output_format)
+    if append_new_only:
+        new_canonical = [
+            record
+            for record in canonical
+            if record_row_ids.get(id(record)) in new_row_ids
+        ]
+        if new_canonical:
+            append_results(new_canonical, output_dir, query.output_format)
+    else:
+        export_results(canonical, output_dir, query.output_format)
     _export_duplicates(duplicates, output_dir)
     return canonical, exit_reason
 

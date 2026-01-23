@@ -127,6 +127,13 @@ def list_record_ids(conn: sqlite3.Connection, run_id: int) -> set[str]:
     return {row["record_id"] for row in cur.fetchall() if row["record_id"]}
 
 
+def count_records(conn: sqlite3.Connection, run_id: int) -> int:
+    """Return number of records stored for a run."""
+    cur = conn.execute("SELECT COUNT(1) AS count FROM records WHERE run_id=?", (run_id,))
+    row = cur.fetchone()
+    return int(row["count"]) if row else 0
+
+
 def list_downloaded_ids(conn: sqlite3.Connection, run_id: int) -> set[str]:
     """Return record IDs with successful downloads."""
     cur = conn.execute(
