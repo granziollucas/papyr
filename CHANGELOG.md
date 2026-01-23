@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## 1.1 - 2026-01-23
+- Select output format (CSV or TSV) during the search wizard; persisted per run.
+- Add TSV export with UTF-8 BOM for improved Excel/pandas compatibility.
+- Switch CSV export to UTF-8 BOM to prevent Unicode encoding errors.
+- Normalize IDs to codes only (DOI/arXiv/ISBN), not URLs.
+- Show shell guidance lines after runs complete, stop, or save+exit.
+- Add keyboard controls for pause/resume/save+exit/stop with control-file fallback.
+- Show running/paused status in the progress line.
+
 ## Unreleased
 - Add launcher shell mode when running `papyr.bat`, `papyr.sh`, or `papyr.command` with no arguments.
 - Add credential check guidance in `papyr doctor` with step-by-step command help.
