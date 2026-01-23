@@ -78,6 +78,7 @@ def run_metasearch(
     providers: Iterable,
     config: dict[str, str],
     console: Console | None = None,
+    resume_run_id: int | None = None,
 ) -> tuple[list[PaperRecord], str]:
     """Run sequential provider searches with persistence and CSV export."""
     console = console or Console()
@@ -103,8 +104,11 @@ def run_metasearch(
     conn = db.connect(output_dir / "state.sqlite")
     db.init_db(conn)
 
-    run_row = repo.get_run_by_hash(conn, query_hash)
-    run_id = run_row["id"] if run_row else repo.create_run(conn, query_hash, query.model_dump())
+    if resume_run_id is not None:
+        run_id = resume_run_id
+    else:
+        run_row = repo.get_run_by_hash(conn, query_hash)
+        run_id = run_row["id"] if run_row else repo.create_run(conn, query_hash, query.model_dump())
 
     existing_ids = repo.list_record_ids(conn, run_id)
     all_records: list[PaperRecord] = []

@@ -12,8 +12,12 @@ from papyr.adapters import default_providers
 from papyr.adapters.crossref import CrossrefProvider
 from papyr.adapters.ssrn import SsrnProvider
 from papyr.cli import prompts
-from papyr.core.models import SearchQuery
+from papyr.core.models import PaperRecord, SearchQuery
 from papyr.core.pipeline import run_metasearch
+from papyr.core.state import db, repo
+from papyr.core.downloader import download_pdf
+from papyr.util.fs import safe_filename
+from papyr.util.hashing import stable_hash
 from papyr.util.config import DEFAULT_ENV_PATH, load_env_file, set_env_value
 
 
@@ -138,11 +142,132 @@ def run_new_wizard(console: Console) -> None:
         for line in prompts.BOOTSTRAP_CHOICES:
             console.print(line)
         console.print(prompts.SHELL_HINT)
-    console.print("Search complete. Results saved to results.csv")
+    output_name = "results.tsv" if query.output_format == "tsv" else "results.csv"
+    console.print(f"Search complete. Results saved to {output_name}")
+
+
+def _resolve_params_path(input_path: str) -> Path | None:
+    candidate = Path(input_path).expanduser()
+    if candidate.is_dir():
+        params_path = candidate / "search_params.json"
+        return params_path if params_path.exists() else None
+    if candidate.is_file():
+        return candidate if candidate.name.lower() == "search_params.json" else None
+    return None
 
 
 def run_resume_wizard(console: Console, params_path: str) -> None:
     """Run resume wizard."""
     console.print(prompts.RESUME_TITLE)
-    console.print(f"Params file: {params_path}")
-    console.print(prompts.NOT_IMPLEMENTED)
+    resolved = _resolve_params_path(params_path)
+    if not resolved:
+        console.print("Could not find search_params.json at that path.")
+        return
+    console.print(f"Params file: {resolved}")
+    config = load_env_file(DEFAULT_ENV_PATH)
+    _configure_missing_providers(console)
+    config = load_env_file(DEFAULT_ENV_PATH)
+    params_text = resolved.read_text(encoding="utf-8")
+    query = SearchQuery.model_validate_json(params_text)
+    original_hash = stable_hash(query.model_dump())
+    _maybe_edit_resume_query(query)
+    resolved.write_text(query.model_dump_json(indent=2), encoding="utf-8")
+    providers = default_providers()
+    run_id = _resolve_run_id(query, original_hash)
+    if typer.confirm("Check existing records for missing PDFs and download now?", default=False):
+        if not query.download_pdfs:
+            if typer.confirm("Downloads are disabled in this run. Enable downloads now?", default=True):
+                query.download_pdfs = True
+                resolved.write_text(query.model_dump_json(indent=2), encoding="utf-8")
+        if query.download_pdfs:
+            _download_missing_pdfs(console, query, providers, run_id)
+    console.print("Keyboard: p=pause, r=resume, s=save+exit, q=stop.")
+    console.print("Control file fallback: .papyr_control with PAUSE/RESUME/STOP/SAVE_EXIT in output folder.")
+    _, _exit_reason = run_metasearch(query, providers, config, console=console, resume_run_id=run_id)
+    if os.getenv("PAPYR_SHELL"):
+        for line in prompts.BOOTSTRAP_CHOICES:
+            console.print(line)
+        console.print(prompts.SHELL_HINT)
+    output_name = "results.tsv" if query.output_format == "tsv" else "results.csv"
+    console.print(f"Search complete. Results saved to {output_name}")
+
+
+def _resolve_run_id(query: SearchQuery, original_hash: str) -> int:
+    output_dir = Path(query.output_dir)
+    conn = db.connect(output_dir / "state.sqlite")
+    db.init_db(conn)
+    run_row = repo.get_run_by_hash(conn, original_hash)
+    if run_row:
+        return int(run_row["id"])
+    return repo.create_run(conn, stable_hash(query.model_dump()), query.model_dump())
+
+
+def _maybe_edit_resume_query(query: SearchQuery) -> None:
+    if not typer.confirm("Edit search parameters before resuming?", default=False):
+        return
+    keywords = typer.prompt("Keywords", default=query.keywords)
+    year_start = typer.prompt("Start year (optional)", default=str(query.year_start or ""))
+    year_end = typer.prompt("End year (optional)", default=str(query.year_end or ""))
+    types_raw = typer.prompt("Publication types (comma-separated)", default=",".join(query.types))
+    fields_raw = typer.prompt("Search fields (comma-separated)", default=",".join(query.fields_to_search))
+    lang_raw = typer.prompt("Language codes or names (comma-separated)", default=",".join(query.languages))
+    access_filter = typer.prompt("Access filter: open/closed/both", default=query.access_filter)
+    sort_order = typer.prompt("Sort order", default=query.sort_order)
+    limit_raw = typer.prompt("Result limit (optional)", default=str(query.limit or ""))
+    download_pdfs = typer.confirm("Download PDFs?", default=query.download_pdfs)
+    output_format = typer.prompt("Output format: csv or tsv", default=query.output_format).strip().lower()
+    if output_format not in {"csv", "tsv"}:
+        output_format = query.output_format
+
+    query.keywords = keywords
+    query.year_start = int(year_start) if str(year_start).strip() else None
+    query.year_end = int(year_end) if str(year_end).strip() else None
+    query.types = [t.strip() for t in types_raw.split(",") if t.strip()]
+    query.fields_to_search = [f.strip() for f in fields_raw.split(",") if f.strip()]
+    query.languages = [l.strip() for l in lang_raw.split(",") if l.strip()]
+    query.access_filter = access_filter
+    query.sort_order = sort_order
+    query.limit = int(limit_raw) if str(limit_raw).strip() else None
+    query.download_pdfs = download_pdfs
+    query.output_format = output_format
+
+
+def _download_missing_pdfs(
+    console: Console,
+    query: SearchQuery,
+    providers: list,
+    run_id: int,
+) -> None:
+    output_dir = Path(query.output_dir)
+    conn = db.connect(output_dir / "state.sqlite")
+    db.init_db(conn)
+    rows = repo.list_records(conn, run_id)
+    downloaded_ids = repo.list_downloaded_ids(conn, run_id)
+    providers_by_name = {provider.name: provider for provider in providers}
+    files_dir = output_dir / "files"
+    files_dir.mkdir(parents=True, exist_ok=True)
+    for row in rows:
+        record = PaperRecord.model_validate_json(row["normalized_json"])
+        if record.id and record.id in downloaded_ids:
+            continue
+        provider = providers_by_name.get(record.origin)
+        if not provider:
+            continue
+        urls = provider.get_official_urls(record)
+        pdf_url = urls.get("pdf_url") if urls else None
+        if not pdf_url:
+            continue
+        filename = safe_filename(record.title, record.id or record.url)
+        dest = files_dir / filename
+        result = download_pdf(pdf_url, dest)
+        status = "ok" if result.ok else "failed"
+        repo.upsert_download(
+            conn,
+            run_id,
+            record.id or None,
+            pdf_url,
+            str(dest) if result.ok else None,
+            status,
+            result.attempts,
+            None if result.ok else result.message,
+        )

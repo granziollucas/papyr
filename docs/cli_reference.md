@@ -41,7 +41,10 @@ During runs:
 - A progress bar with ETA shows overall search progress (ETA is most accurate when a limit is set).
 
 ## papyr resume
-Resumes a prior search. You must pass the path to `search_params.json`.
+Resumes a prior search. You can pass a run folder or the path to `search_params.json`.
+During resume:
+- Optionally edit search parameters
+- Optionally download missing PDFs for records already saved
 
 ## papyr config show
 Shows current config with secrets redacted.

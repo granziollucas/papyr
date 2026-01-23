@@ -10,8 +10,10 @@ Papyr uses SQLite (`state.sqlite`) to persist everything needed for resume and i
 - Failures
 
 ## Resume flow
-1) Run `papyr resume <path to search_params.json>`
-2) Papyr loads the run folder from that path
+1) Run `papyr resume <run folder>` or `papyr resume <path to search_params.json>`
+2) Papyr resolves the run folder and loads the search parameters
+3) You can optionally edit parameters before resuming
+4) You can optionally download missing PDFs for already saved records
 3) Provider cursors are read from SQLite and the run continues
 
 ## Incremental runs

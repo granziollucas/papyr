@@ -127,6 +127,15 @@ def list_record_ids(conn: sqlite3.Connection, run_id: int) -> set[str]:
     return {row["record_id"] for row in cur.fetchall() if row["record_id"]}
 
 
+def list_downloaded_ids(conn: sqlite3.Connection, run_id: int) -> set[str]:
+    """Return record IDs with successful downloads."""
+    cur = conn.execute(
+        "SELECT record_id FROM downloads WHERE run_id=? AND status='ok' AND record_id IS NOT NULL",
+        (run_id,),
+    )
+    return {row["record_id"] for row in cur.fetchall() if row["record_id"]}
+
+
 def mark_duplicate(
     conn: sqlite3.Connection,
     record_row_id: int,

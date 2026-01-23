@@ -45,13 +45,13 @@ def new_command() -> None:
 def resume_command(
     params_path: str | None = typer.Argument(
         None,
-        help="Path to search_params.json",
+        help="Path to run folder or search_params.json",
     )
 ) -> None:
     """Resume a prior search."""
     if not params_path:
         params_path = typer.prompt(
-            "Step 1/1: Path to search_params.json. Example: C:\\Papyr\\runs\\climate\\search_params.json"
+            "Step 1/1: Path to run folder or search_params.json. Example: C:\\Papyr\\runs\\climate"
         )
     wizard.run_resume_wizard(console, params_path)
 
