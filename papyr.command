@@ -15,6 +15,7 @@ if ! "$PYTHON" -m papyr bootstrap; then
   exit 1
 fi
 printf '%s\n' 'Papyr shell. Type "help" for commands, "exit" to quit.'
+export PAPYR_SHELL=1
 while true; do
   printf '%s' 'papyr> '
   if ! IFS= read -r line; then

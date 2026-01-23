@@ -33,6 +33,7 @@ Prompts:
 - Download PDFs (yes/no)
 - Output directory
 - Dry-run (yes/no)
+- Output format: csv / tsv
 
 During runs:
 - Keyboard shortcuts: p=pause, r=resume, s=save+exit, q=stop.

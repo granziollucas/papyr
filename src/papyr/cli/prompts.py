@@ -49,6 +49,7 @@ GUIDE_RESUME_STEPS = [
 BOOTSTRAP_CHOICES = [
     "Type 'new' for a new search (example: new) or 'resume' to pick up from another search (example: resume).",
 ]
+SHELL_HINT = 'Papyr shell. Type "help" for commands, "exit" to quit.'
 BOOTSTRAP_SKIP_PROMPT = "Skip credential setup and continue?"
 
 NEW_WIZARD_INTRO = "Configure your search. Press Enter to accept defaults."
@@ -65,3 +66,4 @@ PROMPT_LIMIT = "Step 9/12: Result limit (optional). Example: 200"
 PROMPT_DOWNLOAD = "Step 10/12: Download PDFs? values: yes or no"
 PROMPT_OUTPUT = "Step 11/12: Output directory (required). Example: C:\\Papyr\\runs\\climate"
 PROMPT_DRY_RUN = "Step 12/12: Dry run? values: yes or no"
+PROMPT_OUTPUT_FORMAT = "Step 13/13: Output format: csv (default) or tsv"

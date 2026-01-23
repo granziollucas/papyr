@@ -1,56 +1,22 @@
-"""CSV export."""
+"""TSV export."""
 
 from __future__ import annotations
 
 import csv
 from pathlib import Path
 
+from papyr.core.export_csv import CSV_COLUMNS, _csv_value
 from papyr.core.models import PaperRecord
 
 
-CSV_COLUMNS = [
-    "Authors",
-    "Title",
-    "Abstract",
-    "Origin",
-    "Volume",
-    "Issue",
-    "Pages",
-    "Publisher",
-    "Month",
-    "Year",
-    "Type",
-    "Keywords",
-    "Citations",
-    "OA",
-    "ID",
-    "URL",
-    "License",
-    "RetrievedAt",
-    "QueryHash",
-    "DuplicateOf",
-]
-
-
-def _csv_value(value: object) -> str:
-    """Normalize values for safer CSV consumption in common tools."""
-    if value is None:
-        return ""
-    text = str(value)
-    # Normalize line breaks to avoid row-splitting in naive CSV readers.
-    text = text.replace("\r\n", "\n").replace("\r", "\n")
-    if "\n" in text:
-        text = " ".join(text.splitlines())
-    return text
-
-
-def export_csv(records: list[PaperRecord], path: Path) -> None:
-    """Write CSV in UTF-8 with BOM for Excel friendliness."""
+def export_tsv(records: list[PaperRecord], path: Path) -> None:
+    """Write TSV in UTF-8 with BOM for Excel friendliness."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8-sig", newline="") as handle:
         writer = csv.DictWriter(
             handle,
             fieldnames=CSV_COLUMNS,
+            delimiter="\t",
             quoting=csv.QUOTE_ALL,
             doublequote=True,
             lineterminator="\n",

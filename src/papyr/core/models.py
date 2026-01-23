@@ -25,6 +25,7 @@ class SearchQuery(BaseModel):
     download_pdfs: bool = False
     output_dir: str
     dry_run: bool = False
+    output_format: Literal["csv", "tsv"] = "csv"
     extra: dict[str, str] = Field(default_factory=dict)
 
 

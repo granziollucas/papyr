@@ -18,6 +18,7 @@ goto :eof
 if errorlevel 1 pause
 if errorlevel 1 goto :eof
 echo Papyr shell. Type "help" for commands, "exit" to quit.
+set "PAPYR_SHELL=1"
 :loop
 set /p PAPYR_CMD=papyr^> 
 if "%PAPYR_CMD%"=="" goto loop

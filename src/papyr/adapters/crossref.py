@@ -92,6 +92,12 @@ class CrossrefProvider(Provider):
 
     def normalize(self, raw: RawRecord) -> PaperRecord:
         data = raw.data
+        doi = raw.record_id or ""
+        isbn = ""
+        if not doi:
+            isbns = data.get("ISBN", []) or []
+            if isinstance(isbns, list) and isbns:
+                isbn = str(isbns[0])
         authors = []
         for author in data.get("author", []) or []:
             given = author.get("given", "")
@@ -113,8 +119,8 @@ class CrossrefProvider(Provider):
             origin=self.name,
             publisher=publisher,
             year=year,
-            id=raw.record_id or "",
-            url=f"https://doi.org/{raw.record_id}" if raw.record_id else "",
+            id=doi or isbn,
+            url=f"https://doi.org/{doi}" if doi else data.get("URL", ""),
             retrieved_at=now_iso(),
         )
         return record

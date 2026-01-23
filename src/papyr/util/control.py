@@ -117,16 +117,16 @@ def clear_control_command(control_path: Path) -> None:
         control_path.write_text("", encoding="utf-8")
 
 
-def wait_if_paused(control_path: Path, keyboard: KeyboardControl | None = None) -> bool:
-    """Pause loop; return False if stop requested."""
+def wait_if_paused(control_path: Path, keyboard: KeyboardControl | None = None) -> str:
+    """Pause loop; returns resume/stop/save_exit."""
     while True:
         cmd = poll_control(control_path, keyboard)
         if cmd == "STOP":
-            return False
+            return "stop"
         if cmd == "SAVE_EXIT":
-            return False
+            return "save_exit"
         if cmd == "RESUME":
-            return True
+            return "resume"
         time.sleep(1.0)
 
 

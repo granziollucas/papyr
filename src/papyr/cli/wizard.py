@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from rich.console import Console
@@ -111,6 +112,9 @@ def run_new_wizard(console: Console) -> None:
     download_pdfs = typer.confirm(prompts.PROMPT_DOWNLOAD, default=False)
     output_dir = typer.prompt(prompts.PROMPT_OUTPUT)
     dry_run = typer.confirm(prompts.PROMPT_DRY_RUN, default=False)
+    output_format = typer.prompt(prompts.PROMPT_OUTPUT_FORMAT, default="csv").strip().lower()
+    if output_format not in {"csv", "tsv"}:
+        output_format = "csv"
 
     query = SearchQuery(
         keywords=keywords,
@@ -125,10 +129,15 @@ def run_new_wizard(console: Console) -> None:
         download_pdfs=download_pdfs,
         output_dir=output_dir,
         dry_run=dry_run,
+        output_format=output_format,
     )
     console.print("Keyboard: p=pause, r=resume, s=save+exit, q=stop.")
     console.print("Control file fallback: .papyr_control with PAUSE/RESUME/STOP/SAVE_EXIT in output folder.")
-    run_metasearch(query, providers, config, console=console)
+    _, exit_reason = run_metasearch(query, providers, config, console=console)
+    if os.getenv("PAPYR_SHELL"):
+        for line in prompts.BOOTSTRAP_CHOICES:
+            console.print(line)
+        console.print(prompts.SHELL_HINT)
     console.print("Search complete. Results saved to results.csv")
 
 

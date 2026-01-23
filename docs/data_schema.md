@@ -18,7 +18,7 @@ Papyr exports a CSV with fixed columns. Columns are always present even if blank
 - Keywords
 - Citations
 - OA: true/false/unknown
-- ID: DOI/arXiv/SSRN id
+- ID: DOI/arXiv/SSRN id (or ISBN for books)
 - URL: official landing page
 - License
 - RetrievedAt: ISO timestamp
@@ -26,9 +26,9 @@ Papyr exports a CSV with fixed columns. Columns are always present even if blank
 - DuplicateOf: if deduped
 
 ## Encoding and delimiter
-- Comma-separated
-- UTF-8 with BOM (utf-8-sig) for Excel compatibility
-- Proper quoting and escaping for commas/newlines
+- Output format is chosen per run: CSV or TSV.
+- CSV: comma-separated, UTF-8 with BOM (utf-8-sig), quoted fields.
+- TSV: tab-separated, UTF-8 with BOM (utf-8-sig), quoted fields.
 
 ## RIS Mapping (best-effort)
 - TY: derived from Type

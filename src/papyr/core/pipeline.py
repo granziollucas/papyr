@@ -14,6 +14,7 @@ from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn
 from papyr.core.dedup import find_duplicates
 from papyr.core.downloader import download_pdf
 from papyr.core.export_csv import export_csv
+from papyr.core.export_tsv import export_tsv
 from papyr.core.models import PaperRecord, ProviderState, RawRecord, SearchQuery
 from papyr.core.normalize import normalize_generic
 from papyr.core.state import db, repo
@@ -42,8 +43,12 @@ def apply_metadata(records: list[PaperRecord], query: SearchQuery) -> list[Paper
     return records
 
 
-def export_results(records: list[PaperRecord], output_dir: Path) -> Path:
-    """Export results.csv and return its path."""
+def export_results(records: list[PaperRecord], output_dir: Path, output_format: str) -> Path:
+    """Export results in the requested format and return its path."""
+    if output_format == "tsv":
+        path = output_dir / "results.tsv"
+        export_tsv(records, path)
+        return path
     path = output_dir / "results.csv"
     export_csv(records, path)
     return path
@@ -73,7 +78,7 @@ def run_metasearch(
     providers: Iterable,
     config: dict[str, str],
     console: Console | None = None,
-) -> list[PaperRecord]:
+) -> tuple[list[PaperRecord], str]:
     """Run sequential provider searches with persistence and CSV export."""
     console = console or Console()
     output_dir = Path(query.output_dir)
@@ -108,6 +113,7 @@ def run_metasearch(
     keyboard = KeyboardControl()
     keyboard.start()
     stop_requested = False
+    exit_reason = "completed"
 
     total = query.limit if query.limit is not None else None
     progress_columns = [
@@ -128,15 +134,19 @@ def run_metasearch(
                 cmd = poll_control(control_path, keyboard)
                 if cmd == "STOP":
                     stop_requested = True
+                    exit_reason = "stopped"
                     break
                 if cmd == "SAVE_EXIT":
                     stop_requested = True
+                    exit_reason = "save_exit"
                     break
                 if cmd == "PAUSE":
                     status = "Paused"
                     progress.update(task_id, description=f"Searching {provider.name} [{status}]")
-                    if not wait_if_paused(control_path, keyboard):
+                    pause_result = wait_if_paused(control_path, keyboard)
+                    if pause_result != "resume":
                         stop_requested = True
+                        exit_reason = "save_exit" if pause_result == "save_exit" else "stopped"
                         break
                     status = "Running"
                     progress.update(task_id, description=f"Searching {provider.name} [{status}]")
@@ -147,15 +157,19 @@ def run_metasearch(
                         cmd = poll_control(control_path, keyboard)
                         if cmd == "STOP":
                             stop_requested = True
+                            exit_reason = "stopped"
                             break
                         if cmd == "SAVE_EXIT":
                             stop_requested = True
+                            exit_reason = "save_exit"
                             break
                         if cmd == "PAUSE":
                             status = "Paused"
                             progress.update(task_id, description=f"Searching {provider.name} [{status}]")
-                            if not wait_if_paused(control_path, keyboard):
+                            pause_result = wait_if_paused(control_path, keyboard)
+                            if pause_result != "resume":
                                 stop_requested = True
+                                exit_reason = "save_exit" if pause_result == "save_exit" else "stopped"
                                 break
                             status = "Running"
                             progress.update(task_id, description=f"Searching {provider.name} [{status}]")
@@ -233,9 +247,9 @@ def run_metasearch(
             if row_id:
                 repo.mark_duplicate(conn, row_id, duplicate_of)
 
-    export_results(canonical, output_dir)
+    export_results(canonical, output_dir, query.output_format)
     _export_duplicates(duplicates, output_dir)
-    return canonical
+    return canonical, exit_reason
 
 
 def _export_duplicates(

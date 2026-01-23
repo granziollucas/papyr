@@ -78,7 +78,8 @@ class ArxivProvider(Provider):
             if not entries:
                 break
             for entry in entries:
-                arxiv_id = entry.findtext("atom:id", default="", namespaces=ns)
+                arxiv_url = entry.findtext("atom:id", default="", namespaces=ns)
+                arxiv_id = arxiv_url.rsplit("/", 1)[-1] if arxiv_url else ""
                 title = entry.findtext("atom:title", default="", namespaces=ns)
                 summary = entry.findtext("atom:summary", default="", namespaces=ns)
                 authors = [
@@ -91,6 +92,8 @@ class ArxivProvider(Provider):
                     "summary": summary.strip(),
                     "authors": authors,
                     "published": published,
+                    "arxiv_id": arxiv_id,
+                    "url": arxiv_url,
                 }
                 yield RawRecord(provider=self.name, data=data, record_id=arxiv_id)
                 if remaining is not None:
@@ -123,8 +126,8 @@ class ArxivProvider(Provider):
             abstract=data.get("summary", ""),
             origin=self.name,
             year=year,
-            id=raw.record_id or "",
-            url=raw.record_id or "",
+            id=data.get("arxiv_id", "") or raw.record_id or "",
+            url=data.get("url", ""),
             retrieved_at=now_iso(),
             type="preprint",
         )
