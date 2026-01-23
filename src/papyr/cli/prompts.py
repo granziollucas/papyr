@@ -53,6 +53,7 @@ SHELL_HINT = 'Papyr shell. Type "help" for commands, "exit" to quit.'
 BOOTSTRAP_SKIP_PROMPT = "Skip credential setup and continue?"
 
 NEW_WIZARD_INTRO = "Configure your search. Press Enter to accept defaults."
+WIZARD_BACK_HINT = "Tip: type 'back' (or 'b') to return to the previous step."
 
 PROMPT_KEYWORDS = "Step 1/12: Keywords (required). Example: climate policy"
 PROMPT_YEAR_START = "Step 2/12: Start year (optional). Example: 2019"

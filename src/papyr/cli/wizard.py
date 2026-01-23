@@ -104,36 +104,23 @@ def run_new_wizard(console: Console) -> None:
             else:
                 set_env_value(DEFAULT_ENV_PATH, "SSRN_ENABLED", "0")
     console.print(prompts.NEW_WIZARD_INTRO)
-    keywords = typer.prompt(prompts.PROMPT_KEYWORDS)
-    year_start = typer.prompt(prompts.PROMPT_YEAR_START, default="")
-    year_end = typer.prompt(prompts.PROMPT_YEAR_END, default="")
-    types_raw = typer.prompt(prompts.PROMPT_TYPES, default="")
-    fields_raw = typer.prompt(prompts.PROMPT_FIELDS, default="")
-    lang_raw = typer.prompt(prompts.PROMPT_LANG, default="")
-    access_filter = typer.prompt(prompts.PROMPT_ACCESS, default="both")
-    sort_order = typer.prompt(prompts.PROMPT_SORT, default="relevance")
-    limit_raw = typer.prompt(prompts.PROMPT_LIMIT, default="")
-    download_pdfs = typer.confirm(prompts.PROMPT_DOWNLOAD, default=False)
-    output_dir = typer.prompt(prompts.PROMPT_OUTPUT)
-    dry_run = typer.confirm(prompts.PROMPT_DRY_RUN, default=False)
-    output_format = typer.prompt(prompts.PROMPT_OUTPUT_FORMAT, default="csv").strip().lower()
-    if output_format not in {"csv", "tsv"}:
-        output_format = "csv"
+    console.print(prompts.WIZARD_BACK_HINT)
+    values = _run_new_steps(console)
 
     query = SearchQuery(
-        keywords=keywords,
-        year_start=int(year_start) if str(year_start).strip() else None,
-        year_end=int(year_end) if str(year_end).strip() else None,
-        types=[t.strip() for t in types_raw.split(",") if t.strip()],
-        fields_to_search=[f.strip() for f in fields_raw.split(",") if f.strip()],
-        languages=[l.strip() for l in lang_raw.split(",") if l.strip()],
-        access_filter=access_filter,
-        sort_order=sort_order,
-        limit=int(limit_raw) if str(limit_raw).strip() else None,
-        download_pdfs=download_pdfs,
-        output_dir=output_dir,
-        dry_run=dry_run,
-        output_format=output_format,
+        keywords=values["keywords"],
+        year_start=values["year_start"],
+        year_end=values["year_end"],
+        types=values["types"],
+        fields_to_search=values["fields_to_search"],
+        languages=values["languages"],
+        access_filter=values["access_filter"],
+        sort_order=values["sort_order"],
+        limit=values["limit"],
+        download_pdfs=values["download_pdfs"],
+        output_dir=values["output_dir"],
+        dry_run=values["dry_run"],
+        output_format=values["output_format"],
     )
     console.print("Keyboard: p=pause, r=resume, s=save+exit, q=stop.")
     console.print("Control file fallback: .papyr_control with PAUSE/RESUME/STOP/SAVE_EXIT in output folder.")
@@ -172,7 +159,10 @@ def run_resume_wizard(console: Console, params_path: str) -> None:
     original_hash = stable_hash(query.model_dump())
     run_id = _resolve_run_id(query, original_hash)
     existing_count = _count_existing_records(query, run_id)
-    do_search, desired_limit, downloads_requested = _maybe_edit_resume_query(query, existing_count)
+    console.print(prompts.WIZARD_BACK_HINT)
+    do_search, desired_limit, downloads_requested = _maybe_edit_resume_query(
+        console, query, existing_count
+    )
     resolved.write_text(query.model_dump_json(indent=2), encoding="utf-8")
     providers = default_providers()
     if downloads_requested is None:
@@ -228,45 +218,28 @@ def _resolve_run_id(query: SearchQuery, original_hash: str) -> int:
 
 
 def _maybe_edit_resume_query(
-    query: SearchQuery, existing_count: int
+    console: Console, query: SearchQuery, existing_count: int
 ) -> tuple[bool, int | None, bool | None]:
     if not typer.confirm("Edit search parameters before resuming?", default=False):
         return True, query.limit, None
-    keywords = typer.prompt("Keywords", default=query.keywords)
-    year_start = typer.prompt("Start year (optional)", default=str(query.year_start or ""))
-    year_end = typer.prompt("End year (optional)", default=str(query.year_end or ""))
-    types_raw = typer.prompt("Publication types (comma-separated)", default=",".join(query.types))
-    fields_raw = typer.prompt("Search fields (comma-separated)", default=",".join(query.fields_to_search))
-    lang_raw = typer.prompt("Language codes or names (comma-separated)", default=",".join(query.languages))
-    access_filter = typer.prompt("Access filter: open/closed/both", default=query.access_filter)
-    sort_order = typer.prompt("Sort order", default=query.sort_order)
-    limit_prompt = (
-        f"Result limit (optional). Leave blank to skip new search; current: {query.limit or ''}"
-    )
-    limit_raw = typer.prompt(limit_prompt, default="")
-    download_pdfs = typer.confirm("Download PDFs?", default=query.download_pdfs)
-    output_format = typer.prompt("Output format: csv or tsv", default=query.output_format).strip().lower()
-    if output_format not in {"csv", "tsv"}:
-        output_format = query.output_format
+    values = _run_resume_edit_steps(console, query, existing_count)
+    query.keywords = values["keywords"]
+    query.year_start = values["year_start"]
+    query.year_end = values["year_end"]
+    query.types = values["types"]
+    query.fields_to_search = values["fields_to_search"]
+    query.languages = values["languages"]
+    query.access_filter = values["access_filter"]
+    query.sort_order = values["sort_order"]
+    query.download_pdfs = values["download_pdfs"]
+    query.output_format = values["output_format"]
+    query.limit = values["limit"]
 
-    query.keywords = keywords
-    query.year_start = int(year_start) if str(year_start).strip() else None
-    query.year_end = int(year_end) if str(year_end).strip() else None
-    query.types = [t.strip() for t in types_raw.split(",") if t.strip()]
-    query.fields_to_search = [f.strip() for f in fields_raw.split(",") if f.strip()]
-    query.languages = [l.strip() for l in lang_raw.split(",") if l.strip()]
-    query.access_filter = access_filter
-    query.sort_order = sort_order
-    query.download_pdfs = download_pdfs
-    query.output_format = output_format
-
-    if not str(limit_raw).strip():
+    if values["limit"] is None:
         return False, None, None
-    limit_value = int(limit_raw)
-    query.limit = limit_value
-    if limit_value <= existing_count:
-        return False, limit_value, None
-    return True, limit_value, None
+    if values["limit"] <= existing_count:
+        return False, values["limit"], None
+    return True, values["limit"], None
 
 
 def _count_existing_records(query: SearchQuery, run_id: int) -> int:
@@ -274,6 +247,131 @@ def _count_existing_records(query: SearchQuery, run_id: int) -> int:
     conn = db.connect(output_dir / "state.sqlite")
     db.init_db(conn)
     return repo.count_records(conn, run_id)
+
+
+def _is_back(value: str) -> bool:
+    return str(value).strip().lower() in {"back", "b"}
+
+
+def _prompt_text(prompt: str, default: str) -> tuple[str, bool]:
+    value = typer.prompt(prompt, default=default)
+    return str(value), _is_back(value)
+
+
+def _prompt_int_optional(console: Console, prompt: str, default: str) -> tuple[int | None, bool]:
+    while True:
+        raw, back = _prompt_text(prompt, default)
+        if back:
+            return None, True
+        if not str(raw).strip():
+            return None, False
+        try:
+            return int(str(raw).strip()), False
+        except ValueError:
+            console.print("Please enter a valid integer or leave blank.")
+
+
+def _prompt_list(prompt: str, default_items: list[str]) -> tuple[list[str], bool]:
+    raw, back = _prompt_text(prompt, ",".join(default_items))
+    if back:
+        return [], True
+    return [t.strip() for t in str(raw).split(",") if t.strip()], False
+
+
+def _prompt_bool(prompt: str, default: bool) -> tuple[bool, bool]:
+    default_text = "yes" if default else "no"
+    while True:
+        raw, back = _prompt_text(f"{prompt} (yes/no/back)", default_text)
+        if back:
+            return False, True
+        value = str(raw).strip().lower()
+        if value in {"y", "yes"}:
+            return True, False
+        if value in {"n", "no"}:
+            return False, False
+
+
+def _prompt_choice(prompt: str, default: str, choices: set[str]) -> tuple[str, bool]:
+    while True:
+        raw, back = _prompt_text(prompt, default)
+        if back:
+            return default, True
+        value = str(raw).strip().lower()
+        if value in choices:
+            return value, False
+
+
+def _run_new_steps(console: Console) -> dict[str, object]:
+    values: dict[str, object] = {}
+    steps = [
+        ("keywords", lambda: _prompt_text(prompts.PROMPT_KEYWORDS, "")),
+        ("year_start", lambda: _prompt_int_optional(console, prompts.PROMPT_YEAR_START, "")),
+        ("year_end", lambda: _prompt_int_optional(console, prompts.PROMPT_YEAR_END, "")),
+        ("types", lambda: _prompt_list(prompts.PROMPT_TYPES, [])),
+        ("fields_to_search", lambda: _prompt_list(prompts.PROMPT_FIELDS, [])),
+        ("languages", lambda: _prompt_list(prompts.PROMPT_LANG, [])),
+        ("access_filter", lambda: _prompt_choice(prompts.PROMPT_ACCESS, "both", {"open", "closed", "both"})),
+        ("sort_order", lambda: _prompt_choice(prompts.PROMPT_SORT, "relevance", {"relevance", "date", "citations"})),
+        ("limit", lambda: _prompt_int_optional(console, prompts.PROMPT_LIMIT, "")),
+        ("download_pdfs", lambda: _prompt_bool(prompts.PROMPT_DOWNLOAD, False)),
+        ("output_dir", lambda: _prompt_text(prompts.PROMPT_OUTPUT, "")),
+        ("dry_run", lambda: _prompt_bool(prompts.PROMPT_DRY_RUN, False)),
+        ("output_format", lambda: _prompt_choice(prompts.PROMPT_OUTPUT_FORMAT, "csv", {"csv", "tsv"})),
+    ]
+    idx = 0
+    while idx < len(steps):
+        key, fn = steps[idx]
+        value, back = fn()
+        if back:
+            idx = max(0, idx - 1)
+            continue
+        values[key] = value
+        idx += 1
+    return values
+
+
+def _run_resume_edit_steps(
+    console: Console, query: SearchQuery, existing_count: int
+) -> dict[str, object]:
+    values: dict[str, object] = {
+        "keywords": query.keywords,
+        "year_start": query.year_start,
+        "year_end": query.year_end,
+        "types": query.types,
+        "fields_to_search": query.fields_to_search,
+        "languages": query.languages,
+        "access_filter": query.access_filter,
+        "sort_order": query.sort_order,
+        "limit": query.limit,
+        "download_pdfs": query.download_pdfs,
+        "output_format": query.output_format,
+    }
+    limit_prompt = (
+        f"Result limit (optional). Leave blank to skip new search; current: {query.limit or ''}"
+    )
+    steps = [
+        ("keywords", lambda: _prompt_text("Keywords", values["keywords"])),
+        ("year_start", lambda: _prompt_int_optional(console, "Start year (optional)", str(values["year_start"] or ""))),
+        ("year_end", lambda: _prompt_int_optional(console, "End year (optional)", str(values["year_end"] or ""))),
+        ("types", lambda: _prompt_list("Publication types (comma-separated)", values["types"])),
+        ("fields_to_search", lambda: _prompt_list("Search fields (comma-separated)", values["fields_to_search"])),
+        ("languages", lambda: _prompt_list("Language codes or names (comma-separated)", values["languages"])),
+        ("access_filter", lambda: _prompt_choice("Access filter: open/closed/both", values["access_filter"], {"open", "closed", "both"})),
+        ("sort_order", lambda: _prompt_text("Sort order", values["sort_order"])),
+        ("limit", lambda: _prompt_int_optional(console, limit_prompt, "")),
+        ("download_pdfs", lambda: _prompt_bool("Download PDFs?", values["download_pdfs"])),
+        ("output_format", lambda: _prompt_choice("Output format: csv or tsv", values["output_format"], {"csv", "tsv"})),
+    ]
+    idx = 0
+    while idx < len(steps):
+        key, fn = steps[idx]
+        value, back = fn()
+        if back:
+            idx = max(0, idx - 1)
+            continue
+        values[key] = value
+        idx += 1
+    return values
 
 
 def _download_missing_pdfs(

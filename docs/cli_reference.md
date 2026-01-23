@@ -34,6 +34,7 @@ Prompts:
 - Output directory
 - Dry-run (yes/no)
 - Output format: csv / tsv
+Tip: type `back` (or `b`) to return to the previous step.
 
 During runs:
 - Keyboard shortcuts: p=pause, r=resume, s=save+exit, q=stop.
