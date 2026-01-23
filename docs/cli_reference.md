@@ -47,6 +47,7 @@ Resumes a prior search. You can pass a run folder or the path to `search_params.
 During resume:
 - Optionally edit search parameters
 - Optionally download missing PDFs for records already saved
+- Result limit: leave blank to skip new search; type `0` to remove the limit.
 
 ## papyr config show
 Shows current config with secrets redacted.

@@ -15,6 +15,7 @@ Papyr uses SQLite (`state.sqlite`) to persist everything needed for resume and i
 3) You can optionally edit parameters before resuming
 4) You can optionally download missing PDFs for already saved records
 5) If you increase the result limit, Papyr fetches only the difference and appends new rows
+6) If you type `0` for the limit during resume, Papyr removes the limit and continues unbounded
 3) Provider cursors are read from SQLite and the run continues
 
 ## Incremental runs
