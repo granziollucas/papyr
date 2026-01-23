@@ -20,6 +20,7 @@ Papyr uses SQLite (`state.sqlite`) to persist everything needed for resume and i
 - `results.csv` is re-exported deterministically from all stored records
 
 ## Pause/resume/stop
-- Create `.papyr_control` in the output directory
-- Write one of: PAUSE, RESUME, STOP
+- Keyboard shortcuts: p=pause, r=resume, s=save+exit, q=stop
+- Control file fallback: create `.papyr_control` in the output directory
+- Write one of: PAUSE, RESUME, STOP, SAVE_EXIT
 - Papyr polls the file during the run

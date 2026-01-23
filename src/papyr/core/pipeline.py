@@ -17,7 +17,7 @@ from papyr.core.export_csv import export_csv
 from papyr.core.models import PaperRecord, ProviderState, RawRecord, SearchQuery
 from papyr.core.normalize import normalize_generic
 from papyr.core.state import db, repo
-from papyr.util.control import read_control_command, wait_if_paused, clear_control_command
+from papyr.util.control import KeyboardControl, poll_control, wait_if_paused
 from papyr.util.fs import safe_filename
 from papyr.util.hashing import stable_hash
 from papyr.util.logging import setup_file_logger
@@ -105,6 +105,9 @@ def run_metasearch(
     all_records: list[PaperRecord] = []
     record_row_ids: dict[int, int] = {}
     control_path = output_dir / ".papyr_control"
+    keyboard = KeyboardControl()
+    keyboard.start()
+    stop_requested = False
 
     total = query.limit if query.limit is not None else None
     progress_columns = [
@@ -114,82 +117,104 @@ def run_metasearch(
         TaskProgressColumn(show_speed=True),
         TimeRemainingColumn(),
     ]
-    with Progress(*progress_columns, console=console) as progress:
-        task_id = progress.add_task("Searching", total=total)
-        for provider in providers:
-            if not provider.is_configured(config):
-                continue
-            progress.update(task_id, description=f"Searching {provider.name}")
-            cmd = read_control_command(control_path)
-            if cmd == "STOP":
-                clear_control_command(control_path)
-                break
-            if cmd == "PAUSE":
-                if not wait_if_paused(control_path):
+    try:
+        with Progress(*progress_columns, console=console) as progress:
+            task_id = progress.add_task("Searching", total=total)
+            for provider in providers:
+                if not provider.is_configured(config):
+                    continue
+                status = "Running"
+                progress.update(task_id, description=f"Searching {provider.name} [{status}]")
+                cmd = poll_control(control_path, keyboard)
+                if cmd == "STOP":
+                    stop_requested = True
                     break
-            state = repo.get_provider_state(conn, run_id, provider.name) or ProviderState()
-            try:
-                for raw in provider.search(query, state):
-                    progress.advance(task_id, 1)
-                    cmd = read_control_command(control_path)
-                    if cmd == "STOP":
-                        clear_control_command(control_path)
+                if cmd == "SAVE_EXIT":
+                    stop_requested = True
+                    break
+                if cmd == "PAUSE":
+                    status = "Paused"
+                    progress.update(task_id, description=f"Searching {provider.name} [{status}]")
+                    if not wait_if_paused(control_path, keyboard):
+                        stop_requested = True
                         break
-                    if cmd == "PAUSE":
-                        if not wait_if_paused(control_path):
+                    status = "Running"
+                    progress.update(task_id, description=f"Searching {provider.name} [{status}]")
+                state = repo.get_provider_state(conn, run_id, provider.name) or ProviderState()
+                try:
+                    for raw in provider.search(query, state):
+                        progress.advance(task_id, 1)
+                        cmd = poll_control(control_path, keyboard)
+                        if cmd == "STOP":
+                            stop_requested = True
                             break
-                    if raw.record_id and raw.record_id in existing_ids:
-                        continue
-                    record = provider.normalize(raw)
-                    record.query_hash = query_hash
-                    record.retrieved_at = now_iso()
-                    all_records.append(record)
-                    row_id = repo.insert_record(conn, run_id, provider.name, raw, record)
-                    record_row_ids[id(record)] = row_id
-                    if raw.record_id:
-                        existing_ids.add(raw.record_id)
-                    if query.download_pdfs and not query.dry_run:
-                        urls = provider.get_official_urls(record)
-                        pdf_url = urls.get("pdf_url") if urls else None
-                        if pdf_url:
-                            filename = safe_filename(record.title, record.id or record.url)
-                            dest = output_dir / "files" / filename
-                            result = download_pdf(pdf_url, dest)
-                            status = "ok" if result.ok else "failed"
-                            repo.upsert_download(
-                                conn,
-                                run_id,
-                                record.id or None,
-                                pdf_url,
-                                str(dest) if result.ok else None,
-                                status,
-                                result.attempts,
-                                None if result.ok else result.message,
-                            )
-            except Exception as exc:  # noqa: BLE001 - log and continue per resilience requirements
-                message = str(exc) or "Provider search failed."
-                stack = traceback.format_exc()
-                repo.log_failure(
-                    conn,
-                    run_id,
-                    provider.name,
-                    "search",
-                    message,
-                    type(exc).__name__,
-                    stack,
-                    None,
-                )
-                _append_error_jsonl(
-                    error_path,
-                    provider.name,
-                    "search",
-                    message,
-                    type(exc).__name__,
-                    stack,
-                )
-                logger.exception("Provider search failed: %s", provider.name)
-                print(f"An error occurred. Please check the log at: {log_path}")
-            repo.upsert_provider_state(conn, run_id, provider.name, state)
+                        if cmd == "SAVE_EXIT":
+                            stop_requested = True
+                            break
+                        if cmd == "PAUSE":
+                            status = "Paused"
+                            progress.update(task_id, description=f"Searching {provider.name} [{status}]")
+                            if not wait_if_paused(control_path, keyboard):
+                                stop_requested = True
+                                break
+                            status = "Running"
+                            progress.update(task_id, description=f"Searching {provider.name} [{status}]")
+                        if raw.record_id and raw.record_id in existing_ids:
+                            continue
+                        record = provider.normalize(raw)
+                        record.query_hash = query_hash
+                        record.retrieved_at = now_iso()
+                        all_records.append(record)
+                        row_id = repo.insert_record(conn, run_id, provider.name, raw, record)
+                        record_row_ids[id(record)] = row_id
+                        if raw.record_id:
+                            existing_ids.add(raw.record_id)
+                        if query.download_pdfs and not query.dry_run:
+                            urls = provider.get_official_urls(record)
+                            pdf_url = urls.get("pdf_url") if urls else None
+                            if pdf_url:
+                                filename = safe_filename(record.title, record.id or record.url)
+                                dest = output_dir / "files" / filename
+                                result = download_pdf(pdf_url, dest)
+                                status = "ok" if result.ok else "failed"
+                                repo.upsert_download(
+                                    conn,
+                                    run_id,
+                                    record.id or None,
+                                    pdf_url,
+                                    str(dest) if result.ok else None,
+                                    status,
+                                    result.attempts,
+                                    None if result.ok else result.message,
+                                )
+                except Exception as exc:  # noqa: BLE001 - log and continue per resilience requirements
+                    message = str(exc) or "Provider search failed."
+                    stack = traceback.format_exc()
+                    repo.log_failure(
+                        conn,
+                        run_id,
+                        provider.name,
+                        "search",
+                        message,
+                        type(exc).__name__,
+                        stack,
+                        None,
+                    )
+                    _append_error_jsonl(
+                        error_path,
+                        provider.name,
+                        "search",
+                        message,
+                        type(exc).__name__,
+                        stack,
+                    )
+                    logger.exception("Provider search failed: %s", provider.name)
+                    print(f"An error occurred. Please check the log at: {log_path}")
+                repo.upsert_provider_state(conn, run_id, provider.name, state)
+                if stop_requested:
+                    break
+    finally:
+        keyboard.stop()
 
     all_rows = repo.list_records(conn, run_id)
     all_records = []

@@ -45,9 +45,9 @@ def _csv_value(value: object) -> str:
 
 
 def export_csv(records: list[PaperRecord], path: Path) -> None:
-    """Write CSV in latin1 encoding for Excel friendliness."""
+    """Write CSV in UTF-8 with BOM for Excel friendliness."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="latin1", newline="") as handle:
+    with path.open("w", encoding="utf-8-sig", newline="") as handle:
         writer = csv.DictWriter(
             handle,
             fieldnames=CSV_COLUMNS,

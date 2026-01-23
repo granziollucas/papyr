@@ -35,7 +35,8 @@ Prompts:
 - Dry-run (yes/no)
 
 During runs:
-- A `.papyr_control` file in the output folder can pause/resume/stop.
+- Keyboard shortcuts: p=pause, r=resume, s=save+exit, q=stop.
+- A `.papyr_control` file in the output folder can pause/resume/stop (fallback).
 - A progress bar with ETA shows overall search progress (ETA is most accurate when a limit is set).
 
 ## papyr resume

@@ -27,7 +27,7 @@ Papyr exports a CSV with fixed columns. Columns are always present even if blank
 
 ## Encoding and delimiter
 - Comma-separated
-- Latin1 encoding for Excel compatibility
+- UTF-8 with BOM (utf-8-sig) for Excel compatibility
 - Proper quoting and escaping for commas/newlines
 
 ## RIS Mapping (best-effort)
