@@ -238,6 +238,8 @@ def _maybe_edit_resume_query(
     query.limit = values["limit"]
 
     if values["limit"] is None:
+        if values.get("limit_removed"):
+            return True, None, None
         return False, None, None
     if values["limit"] <= existing_count:
         return False, values["limit"], None
@@ -349,9 +351,10 @@ def _run_resume_edit_steps(
         "download_pdfs": query.download_pdfs,
         "output_format": query.output_format,
         "parallel_providers": query.parallel_providers,
+        "limit_removed": False,
     }
     limit_prompt = (
-        f"Result limit (optional). Leave blank to skip new search; current: {query.limit or ''}"
+        f\"Result limit (optional). Leave blank to skip new search; type 0 to remove limit; current: {query.limit or ''}\"
     )
     steps = [
         ("keywords", lambda: _prompt_text("Keywords", values["keywords"])),
@@ -362,7 +365,7 @@ def _run_resume_edit_steps(
         ("languages", lambda: _prompt_list("Language codes or names (comma-separated)", values["languages"])),
         ("access_filter", lambda: _prompt_choice("Access filter: open/closed/both", values["access_filter"], {"open", "closed", "both"})),
         ("sort_order", lambda: _prompt_text("Sort order", values["sort_order"])),
-        ("limit", lambda: _prompt_int_optional(console, limit_prompt, "")),
+        ("limit", lambda: _prompt_resume_limit(console, limit_prompt)),
         ("download_pdfs", lambda: _prompt_bool("Download PDFs?", values["download_pdfs"])),
         ("output_format", lambda: _prompt_choice("Output format: csv or tsv", values["output_format"], {"csv", "tsv"})),
         ("parallel_providers", lambda: _prompt_bool("Run providers in parallel?", bool(values["parallel_providers"]))),
@@ -374,9 +377,29 @@ def _run_resume_edit_steps(
         if back:
             idx = max(0, idx - 1)
             continue
-        values[key] = value
+        if key == "limit" and isinstance(value, dict):
+            values["limit"] = value["limit"]
+            values["limit_removed"] = value["limit_removed"]
+        else:
+            values[key] = value
         idx += 1
     return values
+
+
+def _prompt_resume_limit(console: Console, prompt: str) -> tuple[dict[str, object], bool]:
+    while True:
+        raw, back = _prompt_text(prompt, "")
+        if back:
+            return {"limit": None, "limit_removed": False}, True
+        if not str(raw).strip():
+            return {"limit": None, "limit_removed": False}, False
+        value = str(raw).strip()
+        if value == "0":
+            return {"limit": None, "limit_removed": True}, False
+        try:
+            return {"limit": int(value), "limit_removed": False}, False
+        except ValueError:
+            console.print("Please enter a valid integer, 0 to remove the limit, or leave blank.")
 
 
 def _download_missing_pdfs(
