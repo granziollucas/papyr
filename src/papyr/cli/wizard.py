@@ -121,6 +121,7 @@ def run_new_wizard(console: Console) -> None:
         output_dir=values["output_dir"],
         dry_run=values["dry_run"],
         output_format=values["output_format"],
+        parallel_providers=values["parallel_providers"],
     )
     console.print("Keyboard: p=pause, r=resume, s=save+exit, q=stop.")
     console.print("Control file fallback: .papyr_control with PAUSE/RESUME/STOP/SAVE_EXIT in output folder.")
@@ -233,6 +234,7 @@ def _maybe_edit_resume_query(
     query.sort_order = values["sort_order"]
     query.download_pdfs = values["download_pdfs"]
     query.output_format = values["output_format"]
+    query.parallel_providers = values["parallel_providers"]
     query.limit = values["limit"]
 
     if values["limit"] is None:
@@ -317,6 +319,7 @@ def _run_new_steps(console: Console) -> dict[str, object]:
         ("output_dir", lambda: _prompt_text(prompts.PROMPT_OUTPUT, "")),
         ("dry_run", lambda: _prompt_bool(prompts.PROMPT_DRY_RUN, False)),
         ("output_format", lambda: _prompt_choice(prompts.PROMPT_OUTPUT_FORMAT, "csv", {"csv", "tsv"})),
+        ("parallel_providers", lambda: _prompt_bool(prompts.PROMPT_PARALLEL, False)),
     ]
     idx = 0
     while idx < len(steps):
@@ -345,6 +348,7 @@ def _run_resume_edit_steps(
         "limit": query.limit,
         "download_pdfs": query.download_pdfs,
         "output_format": query.output_format,
+        "parallel_providers": query.parallel_providers,
     }
     limit_prompt = (
         f"Result limit (optional). Leave blank to skip new search; current: {query.limit or ''}"
@@ -361,6 +365,7 @@ def _run_resume_edit_steps(
         ("limit", lambda: _prompt_int_optional(console, limit_prompt, "")),
         ("download_pdfs", lambda: _prompt_bool("Download PDFs?", values["download_pdfs"])),
         ("output_format", lambda: _prompt_choice("Output format: csv or tsv", values["output_format"], {"csv", "tsv"})),
+        ("parallel_providers", lambda: _prompt_bool("Run providers in parallel?", bool(values["parallel_providers"]))),
     ]
     idx = 0
     while idx < len(steps):

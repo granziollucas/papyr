@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import csv
 import json
+import threading
+import time
 import traceback
 from pathlib import Path
 from typing import Iterable
@@ -146,131 +148,48 @@ def run_metasearch(
     try:
         with Progress(*progress_columns, console=console) as progress:
             task_id = progress.add_task("Searching", total=total)
-            for provider in providers:
-                if not provider.is_configured(config):
-                    continue
-                status = "Running"
-                progress.update(task_id, description=f"Searching {provider.name} [{status}]")
-                cmd = poll_control(control_path, keyboard)
-                if cmd == "STOP":
-                    stop_requested = True
-                    exit_reason = "stopped"
-                    break
-                if cmd == "SAVE_EXIT":
-                    stop_requested = True
-                    exit_reason = "save_exit"
-                    break
-                if cmd == "PAUSE":
-                    status = "Paused"
-                    progress.update(task_id, description=f"Searching {provider.name} [{status}]")
-                    pause_result = wait_if_paused(control_path, keyboard)
-                    if pause_result != "resume":
-                        stop_requested = True
-                        exit_reason = "save_exit" if pause_result == "save_exit" else "stopped"
-                        break
-                    status = "Running"
-                    progress.update(task_id, description=f"Searching {provider.name} [{status}]")
-                state = repo.get_provider_state(conn, run_id, provider.name) or ProviderState()
-                try:
-                    for raw in provider.search(query, state):
-                        progress.advance(task_id, 1)
-                        cmd = poll_control(control_path, keyboard)
-                        if cmd == "STOP":
-                            stop_requested = True
-                            exit_reason = "stopped"
-                            break
-                        if cmd == "SAVE_EXIT":
-                            stop_requested = True
-                            exit_reason = "save_exit"
-                            break
-                        if cmd == "PAUSE":
-                            status = "Paused"
-                            progress.update(task_id, description=f"Searching {provider.name} [{status}]")
-                            pause_result = wait_if_paused(control_path, keyboard)
-                            if pause_result != "resume":
-                                stop_requested = True
-                                exit_reason = "save_exit" if pause_result == "save_exit" else "stopped"
-                                break
-                            status = "Running"
-                            progress.update(task_id, description=f"Searching {provider.name} [{status}]")
-                        if raw.record_id and raw.record_id in existing_ids:
-                            continue
-                        record = provider.normalize(raw)
-                        record.query_hash = query_hash
-                        record.retrieved_at = now_iso()
-                        all_records.append(record)
-                        row_id = repo.insert_record(conn, run_id, provider.name, raw, record)
-                        record_row_ids[id(record)] = row_id
-                        new_row_ids.add(row_id)
-                        if raw.record_id:
-                            existing_ids.add(raw.record_id)
-                        new_count += 1
-                        if query.download_pdfs and not query.dry_run:
-                            urls = provider.get_official_urls(record)
-                            pdf_url = urls.get("pdf_url") if urls else None
-                            if pdf_url:
-                                filename = safe_filename(record.title, record.id or record.url)
-                                dest = output_dir / "files" / filename
-                                if record.id and record.id in downloaded_ids:
-                                    continue
-                                if dest.exists():
-                                    repo.upsert_download(
-                                        conn,
-                                        run_id,
-                                        record.id or None,
-                                        pdf_url,
-                                        str(dest),
-                                        "ok",
-                                        0,
-                                        None,
-                                    )
-                                    if record.id:
-                                        downloaded_ids.add(record.id)
-                                    continue
-                                result = download_pdf(pdf_url, dest)
-                                status = "ok" if result.ok else "failed"
-                                repo.upsert_download(
-                                    conn,
-                                    run_id,
-                                    record.id or None,
-                                    pdf_url,
-                                    str(dest) if result.ok else None,
-                                    status,
-                                    result.attempts,
-                                    None if result.ok else result.message,
-                                )
-                                if result.ok and record.id:
-                                    downloaded_ids.add(record.id)
-                        if max_new is not None and new_count >= max_new:
-                            stop_requested = True
-                            exit_reason = "completed"
-                            break
-                except Exception as exc:  # noqa: BLE001 - log and continue per resilience requirements
-                    message = str(exc) or "Provider search failed."
-                    stack = traceback.format_exc()
-                    repo.log_failure(
-                        conn,
-                        run_id,
-                        provider.name,
-                        "search",
-                        message,
-                        type(exc).__name__,
-                        stack,
-                        None,
-                    )
-                    _append_error_jsonl(
-                        error_path,
-                        provider.name,
-                        "search",
-                        message,
-                        type(exc).__name__,
-                        stack,
-                    )
-                    logger.exception("Provider search failed: %s", provider.name)
-                    print(f"An error occurred. Please check the log at: {log_path}")
-                repo.upsert_provider_state(conn, run_id, provider.name, state)
-                if stop_requested:
-                    break
+            if query.parallel_providers:
+                (
+                    stop_requested,
+                    exit_reason,
+                    new_row_ids,
+                    existing_ids,
+                    downloaded_ids,
+                ) = _run_parallel_providers(
+                    progress,
+                    task_id,
+                    providers,
+                    query,
+                    query_hash,
+                    config,
+                    output_dir,
+                    control_path,
+                    keyboard,
+                    run_id,
+                    max_new,
+                    existing_ids,
+                    downloaded_ids,
+                    error_path,
+                    log_path,
+                )
+            else:
+                stop_requested, exit_reason, new_row_ids = _run_sequential_providers(
+                    progress,
+                    task_id,
+                    providers,
+                    query,
+                    query_hash,
+                    config,
+                    output_dir,
+                    control_path,
+                    keyboard,
+                    run_id,
+                    max_new,
+                    existing_ids,
+                    downloaded_ids,
+                    error_path,
+                    log_path,
+                )
     finally:
         keyboard.stop()
 
@@ -305,6 +224,327 @@ def run_metasearch(
         export_results(canonical, output_dir, query.output_format)
     _export_duplicates(duplicates, output_dir)
     return canonical, exit_reason
+
+
+def _run_sequential_providers(
+    progress: Progress,
+    task_id: int,
+    providers: Iterable,
+    query: SearchQuery,
+    query_hash: str,
+    config: dict[str, str],
+    output_dir: Path,
+    control_path: Path,
+    keyboard: KeyboardControl,
+    run_id: int,
+    max_new: int | None,
+    existing_ids: set[str],
+    downloaded_ids: set[str],
+    error_path: Path,
+    log_path: Path,
+) -> tuple[bool, str, set[int]]:
+    stop_requested = False
+    exit_reason = "completed"
+    new_count = 0
+    new_row_ids: set[int] = set()
+    conn = db.connect(output_dir / "state.sqlite")
+    db.init_db(conn)
+    logger = setup_file_logger(log_path)
+    for provider in providers:
+        if not provider.is_configured(config):
+            continue
+        status = "Running"
+        progress.update(task_id, description=f"Searching {provider.name} [{status}]")
+        cmd = poll_control(control_path, keyboard)
+        if cmd == "STOP":
+            stop_requested = True
+            exit_reason = "stopped"
+            break
+        if cmd == "SAVE_EXIT":
+            stop_requested = True
+            exit_reason = "save_exit"
+            break
+        if cmd == "PAUSE":
+            status = "Paused"
+            progress.update(task_id, description=f"Searching {provider.name} [{status}]")
+            pause_result = wait_if_paused(control_path, keyboard)
+            if pause_result != "resume":
+                stop_requested = True
+                exit_reason = "save_exit" if pause_result == "save_exit" else "stopped"
+                break
+            status = "Running"
+            progress.update(task_id, description=f"Searching {provider.name} [{status}]")
+        state = repo.get_provider_state(conn, run_id, provider.name) or ProviderState()
+        try:
+            for raw in provider.search(query, state):
+                progress.advance(task_id, 1)
+                cmd = poll_control(control_path, keyboard)
+                if cmd == "STOP":
+                    stop_requested = True
+                    exit_reason = "stopped"
+                    break
+                if cmd == "SAVE_EXIT":
+                    stop_requested = True
+                    exit_reason = "save_exit"
+                    break
+                if cmd == "PAUSE":
+                    status = "Paused"
+                    progress.update(task_id, description=f"Searching {provider.name} [{status}]")
+                    pause_result = wait_if_paused(control_path, keyboard)
+                    if pause_result != "resume":
+                        stop_requested = True
+                        exit_reason = "save_exit" if pause_result == "save_exit" else "stopped"
+                        break
+                    status = "Running"
+                    progress.update(task_id, description=f"Searching {provider.name} [{status}]")
+                if raw.record_id and raw.record_id in existing_ids:
+                    continue
+                record = provider.normalize(raw)
+                record.query_hash = query_hash
+                record.retrieved_at = now_iso()
+                row_id = repo.insert_record(conn, run_id, provider.name, raw, record)
+                new_row_ids.add(row_id)
+                if raw.record_id:
+                    existing_ids.add(raw.record_id)
+                new_count += 1
+                if query.download_pdfs and not query.dry_run:
+                    urls = provider.get_official_urls(record)
+                    pdf_url = urls.get("pdf_url") if urls else None
+                    if pdf_url:
+                        filename = safe_filename(record.title, record.id or record.url)
+                        dest = output_dir / "files" / filename
+                        if record.id and record.id in downloaded_ids:
+                            continue
+                        if dest.exists():
+                            repo.upsert_download(
+                                conn,
+                                run_id,
+                                record.id or None,
+                                pdf_url,
+                                str(dest),
+                                "ok",
+                                0,
+                                None,
+                            )
+                            if record.id:
+                                downloaded_ids.add(record.id)
+                            continue
+                        result = download_pdf(pdf_url, dest)
+                        status = "ok" if result.ok else "failed"
+                        repo.upsert_download(
+                            conn,
+                            run_id,
+                            record.id or None,
+                            pdf_url,
+                            str(dest) if result.ok else None,
+                            status,
+                            result.attempts,
+                            None if result.ok else result.message,
+                        )
+                        if result.ok and record.id:
+                            downloaded_ids.add(record.id)
+                if max_new is not None and new_count >= max_new:
+                    stop_requested = True
+                    exit_reason = "completed"
+                    break
+        except Exception as exc:  # noqa: BLE001 - log and continue per resilience requirements
+            message = str(exc) or "Provider search failed."
+            stack = traceback.format_exc()
+            repo.log_failure(
+                conn,
+                run_id,
+                provider.name,
+                "search",
+                message,
+                type(exc).__name__,
+                stack,
+                None,
+            )
+            _append_error_jsonl(
+                error_path,
+                provider.name,
+                "search",
+                message,
+                type(exc).__name__,
+                stack,
+            )
+            logger.exception("Provider search failed: %s", provider.name)
+            print(f"An error occurred. Please check the log at: {log_path}")
+        repo.upsert_provider_state(conn, run_id, provider.name, state)
+        if stop_requested:
+            break
+    return stop_requested, exit_reason, new_row_ids
+
+
+def _run_parallel_providers(
+    progress: Progress,
+    task_id: int,
+    providers: Iterable,
+    query: SearchQuery,
+    query_hash: str,
+    config: dict[str, str],
+    output_dir: Path,
+    control_path: Path,
+    keyboard: KeyboardControl,
+    run_id: int,
+    max_new: int | None,
+    existing_ids: set[str],
+    downloaded_ids: set[str],
+    error_path: Path,
+    log_path: Path,
+) -> tuple[bool, str, set[int], set[str], set[str]]:
+    status = "Running"
+    progress.update(task_id, description=f"Searching providers [{status}]")
+    ids_lock = threading.Lock()
+    db_lock = threading.Lock()
+    progress_lock = threading.Lock()
+    new_row_ids: set[int] = set()
+    stop_event = threading.Event()
+    pause_event = threading.Event()
+    pause_event.set()
+    exit_reason = {"value": "completed"}
+    new_count = {"value": 0}
+    logger = setup_file_logger(log_path)
+    providers_list = [p for p in providers if p.is_configured(config)]
+
+    def control_loop() -> None:
+        last_status = "Running"
+        while not stop_event.is_set():
+            cmd = poll_control(control_path, keyboard)
+            if cmd == "PAUSE":
+                pause_event.clear()
+                if last_status != "Paused":
+                    with progress_lock:
+                        progress.update(task_id, description="Searching providers [Paused]")
+                    last_status = "Paused"
+            elif cmd == "RESUME":
+                pause_event.set()
+                if last_status != "Running":
+                    with progress_lock:
+                        progress.update(task_id, description="Searching providers [Running]")
+                    last_status = "Running"
+            elif cmd == "STOP":
+                exit_reason["value"] = "stopped"
+                stop_event.set()
+                pause_event.set()
+                break
+            elif cmd == "SAVE_EXIT":
+                exit_reason["value"] = "save_exit"
+                stop_event.set()
+                pause_event.set()
+                break
+            time.sleep(0.2)
+
+    def provider_worker(provider) -> None:
+        conn = db.connect(output_dir / "state.sqlite")
+        db.init_db(conn)
+        state = repo.get_provider_state(conn, run_id, provider.name) or ProviderState()
+        try:
+            for raw in provider.search(query, state):
+                if stop_event.is_set():
+                    break
+                pause_event.wait()
+                with progress_lock:
+                    progress.advance(task_id, 1)
+                with ids_lock:
+                    if raw.record_id and raw.record_id in existing_ids:
+                        continue
+                record = provider.normalize(raw)
+                record.query_hash = query_hash
+                record.retrieved_at = now_iso()
+                with db_lock:
+                    row_id = repo.insert_record(conn, run_id, provider.name, raw, record)
+                    new_row_ids.add(row_id)
+                with ids_lock:
+                    if raw.record_id:
+                        existing_ids.add(raw.record_id)
+                with ids_lock:
+                    new_count["value"] += 1
+                    reached_limit = max_new is not None and new_count["value"] >= max_new
+                if query.download_pdfs and not query.dry_run:
+                    urls = provider.get_official_urls(record)
+                    pdf_url = urls.get("pdf_url") if urls else None
+                    if pdf_url:
+                        filename = safe_filename(record.title, record.id or record.url)
+                        dest = output_dir / "files" / filename
+                        with ids_lock:
+                            already_downloaded = bool(record.id and record.id in downloaded_ids)
+                        if already_downloaded:
+                            pass
+                        elif dest.exists():
+                            with db_lock:
+                                repo.upsert_download(
+                                    conn,
+                                    run_id,
+                                    record.id or None,
+                                    pdf_url,
+                                    str(dest),
+                                    "ok",
+                                    0,
+                                    None,
+                                )
+                            if record.id:
+                                with ids_lock:
+                                    downloaded_ids.add(record.id)
+                        else:
+                            result = download_pdf(pdf_url, dest)
+                            status = "ok" if result.ok else "failed"
+                            with db_lock:
+                                repo.upsert_download(
+                                    conn,
+                                    run_id,
+                                    record.id or None,
+                                    pdf_url,
+                                    str(dest) if result.ok else None,
+                                    status,
+                                    result.attempts,
+                                    None if result.ok else result.message,
+                                )
+                            if result.ok and record.id:
+                                with ids_lock:
+                                    downloaded_ids.add(record.id)
+                if reached_limit:
+                    stop_event.set()
+                    break
+        except Exception as exc:  # noqa: BLE001 - log and continue per resilience requirements
+            message = str(exc) or "Provider search failed."
+            stack = traceback.format_exc()
+            with db_lock:
+                repo.log_failure(
+                    conn,
+                    run_id,
+                    provider.name,
+                    "search",
+                    message,
+                    type(exc).__name__,
+                    stack,
+                    None,
+                )
+                _append_error_jsonl(
+                    error_path,
+                    provider.name,
+                    "search",
+                    message,
+                    type(exc).__name__,
+                    stack,
+                )
+            logger.exception("Provider search failed: %s", provider.name)
+            print(f"An error occurred. Please check the log at: {log_path}")
+        with db_lock:
+            repo.upsert_provider_state(conn, run_id, provider.name, state)
+
+    control_thread = threading.Thread(target=control_loop, name="papyr-control", daemon=True)
+    control_thread.start()
+    threads = [
+        threading.Thread(target=provider_worker, args=(provider,), daemon=True)
+        for provider in providers_list
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    stop_event.set()
+    return stop_event.is_set(), exit_reason["value"], new_row_ids, existing_ids, downloaded_ids
 
 
 def _export_duplicates(

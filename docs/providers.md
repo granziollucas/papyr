@@ -1,6 +1,7 @@
 # Providers
 
-Papyr v1 supports Crossref, arXiv, and SSRN. Providers are queried sequentially with conservative rate limits.
+Papyr v1 supports Crossref, arXiv, and SSRN. Providers are queried sequentially by default with conservative rate limits.
+You can optionally enable parallel provider execution per run.
 
 ## Crossref
 

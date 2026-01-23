@@ -26,6 +26,7 @@ class SearchQuery(BaseModel):
     output_dir: str
     dry_run: bool = False
     output_format: Literal["csv", "tsv"] = "csv"
+    parallel_providers: bool = False
     extra: dict[str, str] = Field(default_factory=dict)
 
 

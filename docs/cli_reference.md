@@ -34,6 +34,7 @@ Prompts:
 - Output directory
 - Dry-run (yes/no)
 - Output format: csv / tsv
+- Run providers in parallel (yes/no)
 Tip: type `back` (or `b`) to return to the previous step.
 
 During runs:
