@@ -2,7 +2,7 @@
 
 ## Architecture summary
 - Provider adapters fetch raw records from external sources.
-- Core pipeline normalizes, deduplicates, persists to SQLite, and exports CSV/TSV/RIS.
+- Core pipeline normalizes, deduplicates, persists to SQLite, and exports XLSX/CSV/TSV/RIS.
 - State lives in `state.sqlite` inside the run folder.
 
 ## Key modules

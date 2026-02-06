@@ -16,6 +16,7 @@ from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn
 from papyr.core.dedup import find_duplicates
 from papyr.core.downloader import download_pdf
 from papyr.core.export_csv import export_csv
+from papyr.core.export_xlsx import export_xlsx
 from papyr.core.export_tsv import export_tsv
 from papyr.core.models import PaperRecord, ProviderState, RawRecord, SearchQuery
 from papyr.core.normalize import normalize_generic
@@ -47,6 +48,10 @@ def apply_metadata(records: list[PaperRecord], query: SearchQuery) -> list[Paper
 
 def export_results(records: list[PaperRecord], output_dir: Path, output_format: str) -> Path:
     """Export results in the requested format and return its path."""
+    if output_format == "xlsx":
+        path = output_dir / "results.xlsx"
+        export_xlsx(records, path)
+        return path
     if output_format == "tsv":
         path = output_dir / "results.tsv"
         export_tsv(records, path)
@@ -58,6 +63,10 @@ def export_results(records: list[PaperRecord], output_dir: Path, output_format: 
 
 def append_results(records: list[PaperRecord], output_dir: Path, output_format: str) -> Path:
     """Append results in the requested format and return its path."""
+    if output_format == "xlsx":
+        path = output_dir / "results.xlsx"
+        export_xlsx(records, path, append=True)
+        return path
     if output_format == "tsv":
         path = output_dir / "results.tsv"
         export_tsv(records, path, append=True)

@@ -26,7 +26,8 @@ Papyr exports a CSV with fixed columns. Columns are always present even if blank
 - DuplicateOf: if deduped
 
 ## Encoding and delimiter
-- Output format is chosen per run: CSV or TSV.
+- Output format is chosen per run: XLSX, CSV, or TSV.
+- XLSX: one sheet per provider (Crossref/arXiv/SSRN) with the same columns.
 - CSV: comma-separated, UTF-8 with BOM (utf-8-sig), quoted fields.
 - TSV: tab-separated, UTF-8 with BOM (utf-8-sig), quoted fields.
 

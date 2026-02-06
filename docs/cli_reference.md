@@ -33,7 +33,7 @@ Prompts:
 - Download PDFs (yes/no)
 - Output directory
 - Dry-run (yes/no)
-- Output format: csv / tsv
+- Output format: xlsx (default) / csv / tsv. XLSX uses one sheet per provider.
 - Run providers in parallel (yes/no)
 Tip: type `back` (or `b`) to return to the previous step.
 

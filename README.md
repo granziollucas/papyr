@@ -79,6 +79,7 @@ See `docs/providers.md` for details.
   search_params.json
   results.csv
   results.tsv
+  results.xlsx
   results.ris
   state.sqlite
   logs/
@@ -90,7 +91,9 @@ See `docs/providers.md` for details.
 ```
 
 Notes:
-- The run creates either `results.csv` or `results.tsv` based on your wizard choice.
+- The run creates `results.xlsx` by default, or `results.csv`/`results.tsv` if selected.
+- The XLSX contains one sheet per provider (Crossref/arXiv/SSRN) with the same columns.
+- Only one of `results.xlsx`, `results.csv`, or `results.tsv` is created per run.
 - All results use UTF-8 with BOM (`utf-8-sig`) for Excel friendliness.
 
 ## Resumability and Incremental Runs

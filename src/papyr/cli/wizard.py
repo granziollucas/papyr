@@ -130,7 +130,10 @@ def run_new_wizard(console: Console) -> None:
         for line in prompts.BOOTSTRAP_CHOICES:
             console.print(line)
         console.print(prompts.SHELL_HINT)
-    output_name = "results.tsv" if query.output_format == "tsv" else "results.csv"
+    if query.output_format == "xlsx":
+        output_name = "results.xlsx"
+    else:
+        output_name = "results.tsv" if query.output_format == "tsv" else "results.csv"
     console.print(f"Search complete. Results saved to {output_name}")
 
 
@@ -188,7 +191,10 @@ def run_resume_wizard(console: Console, params_path: str) -> None:
                 for line in prompts.BOOTSTRAP_CHOICES:
                     console.print(line)
                 console.print(prompts.SHELL_HINT)
-            output_name = "results.tsv" if query.output_format == "tsv" else "results.csv"
+            if query.output_format == "xlsx":
+                output_name = "results.xlsx"
+            else:
+                output_name = "results.tsv" if query.output_format == "tsv" else "results.csv"
             console.print(f"Search complete. Results saved to {output_name}")
             return
     _, _exit_reason = run_metasearch(
@@ -204,7 +210,10 @@ def run_resume_wizard(console: Console, params_path: str) -> None:
         for line in prompts.BOOTSTRAP_CHOICES:
             console.print(line)
         console.print(prompts.SHELL_HINT)
-    output_name = "results.tsv" if query.output_format == "tsv" else "results.csv"
+    if query.output_format == "xlsx":
+        output_name = "results.xlsx"
+    else:
+        output_name = "results.tsv" if query.output_format == "tsv" else "results.csv"
     console.print(f"Search complete. Results saved to {output_name}")
 
 
@@ -320,7 +329,7 @@ def _run_new_steps(console: Console) -> dict[str, object]:
         ("download_pdfs", lambda: _prompt_bool(prompts.PROMPT_DOWNLOAD, False)),
         ("output_dir", lambda: _prompt_text(prompts.PROMPT_OUTPUT, "")),
         ("dry_run", lambda: _prompt_bool(prompts.PROMPT_DRY_RUN, False)),
-        ("output_format", lambda: _prompt_choice(prompts.PROMPT_OUTPUT_FORMAT, "csv", {"csv", "tsv"})),
+        ("output_format", lambda: _prompt_choice(prompts.PROMPT_OUTPUT_FORMAT, "xlsx", {"csv", "tsv", "xlsx"})),
         ("parallel_providers", lambda: _prompt_bool(prompts.PROMPT_PARALLEL, False)),
     ]
     idx = 0
@@ -367,7 +376,14 @@ def _run_resume_edit_steps(
         ("sort_order", lambda: _prompt_text("Sort order", values["sort_order"])),
         ("limit", lambda: _prompt_resume_limit(console, limit_prompt)),
         ("download_pdfs", lambda: _prompt_bool("Download PDFs?", values["download_pdfs"])),
-        ("output_format", lambda: _prompt_choice("Output format: csv or tsv", values["output_format"], {"csv", "tsv"})),
+        (
+            "output_format",
+            lambda: _prompt_choice(
+                "Output format: xlsx, csv, or tsv",
+                values["output_format"],
+                {"csv", "tsv", "xlsx"},
+            ),
+        ),
         ("parallel_providers", lambda: _prompt_bool("Run providers in parallel?", bool(values["parallel_providers"]))),
     ]
     idx = 0

@@ -17,11 +17,12 @@ Papyr uses SQLite (`state.sqlite`) to persist everything needed for resume and i
 5) If you increase the result limit, Papyr fetches only the difference and appends new rows
 6) If you type `0` for the limit during resume, Papyr removes the limit and continues unbounded
 7) Provider cursors are read from SQLite and the run continues
+8) For XLSX output, new rows are appended to the provider sheet in `results.xlsx`
 
 ## Incremental runs
 - Re-running a search in the same output folder reuses the QueryHash
 - Already seen record IDs are skipped
-- `results.csv` is re-exported deterministically from all stored records
+- The chosen results file (xlsx/csv/tsv) is re-exported deterministically from all stored records
 
 ## Pause/resume/stop
 - Keyboard shortcuts (when available): p=pause, r=resume, s=save+exit, q=stop

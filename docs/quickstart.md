@@ -30,8 +30,9 @@ You will be prompted for:
 - Download PDFs (yes/no)
 - Output directory
 - Dry-run (yes/no)
-- Output format (csv/tsv)
+- Output format (xlsx/csv/tsv)
 - Parallel providers (yes/no)
+Default output format is `xlsx`.
 
 ## 3) Resume a search
 ```bash
@@ -58,6 +59,7 @@ papyr export ris
 ```
 <output_dir>/
   search_params.json
+  results.xlsx
   results.csv
   results.tsv
   results.ris
@@ -69,7 +71,7 @@ papyr export ris
   files/
     <sanitized_title>_<shortid>.pdf
 ```
-Only one of `results.csv` or `results.tsv` is created per run.
+Only one of `results.xlsx`, `results.csv`, or `results.tsv` is created per run. XLSX uses one sheet per provider.
 
 ## Pause/resume/stop control
 Create a file named `.papyr_control` in the output directory with one of:
