@@ -14,7 +14,8 @@ def test_export_csv_writes_bom_and_header(local_tmp_dir):
     _assert_bom(path)
     text = path.read_text(encoding="utf-8-sig")
     header = text.splitlines()[0]
-    assert header == ",".join(CSV_COLUMNS)
+    expected = ",".join([f"\"{col}\"" for col in CSV_COLUMNS])
+    assert header == expected
 
 
 def test_export_tsv_writes_bom_and_header(local_tmp_dir):
@@ -23,4 +24,5 @@ def test_export_tsv_writes_bom_and_header(local_tmp_dir):
     _assert_bom(path)
     text = path.read_text(encoding="utf-8-sig")
     header = text.splitlines()[0]
-    assert header == "\t".join(CSV_COLUMNS)
+    expected = "\t".join([f"\"{col}\"" for col in CSV_COLUMNS])
+    assert header == expected
