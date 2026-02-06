@@ -61,6 +61,7 @@ class PaperRecord(BaseModel):
     retrieved_at: str = ""
     query_hash: str = ""
     duplicate_of: str = ""
+    pdf_url: str = ""
 
 
 class ProviderState(BaseModel):

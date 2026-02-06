@@ -45,3 +45,7 @@ Papyr exports a CSV with fixed columns. Columns are always present even if blank
 - Duplicates require matching title and ID by default
 - If title and authors match and one record is a preprint, the preprint is dropped
 - Crossref is canonical when duplicates are found
+
+## OA Notes
+- Crossref records are marked OA when a license or official PDF link is present.
+- PDF downloads for Crossref only use links supplied by Crossref.
