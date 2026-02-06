@@ -17,6 +17,12 @@ dist/
 
 # Tests / tools
 .pytest_cache/
+.pytest-tmp/
+.pytest-bt/
+pytest-bt/
+ps-temp/
+pytest-temp/
+test-tmp/
 .mypy_cache/
 .ruff_cache/
 .coverage

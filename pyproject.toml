@@ -33,3 +33,7 @@ papyr = "papyr.cli.app:app"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/papyr"]
+
+[tool.pytest.ini_options]
+addopts = "-p no:tmpdir --basetemp=.pytest-tmp --ignore=.pytest_cache --ignore=.tmp --ignore=pytest-temp --ignore=ps-temp --ignore=pytest-bt --ignore=test-tmp"
+norecursedirs = [".pytest-tmp", ".pytest_cache", ".tmp", "pytest-temp", "ps-temp", "pytest-bt", "test-tmp"]

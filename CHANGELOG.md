@@ -10,6 +10,9 @@
 - Show running/paused status in the progress line.
 
 ## Unreleased
+- Align AGENTS contract with UTF-8 BOM exports and optional SSRN adapter.
+- Write duplicates CSV with UTF-8 BOM for consistent encoding.
+- Treat keyboard controls as best-effort only when a TTY is available.
 - Add launcher shell mode when running `papyr.bat`, `papyr.sh`, or `papyr.command` with no arguments.
 - Add credential check guidance in `papyr doctor` with step-by-step command help.
 - Run credential check and optional setup before the launcher shell prompt.

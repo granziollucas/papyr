@@ -132,7 +132,8 @@ def run_metasearch(
     new_row_ids: set[int] = set()
     control_path = output_dir / ".papyr_control"
     keyboard = KeyboardControl()
-    keyboard.start()
+    keyboard_enabled = keyboard.start()
+    keyboard_control = keyboard if keyboard_enabled else None
     stop_requested = False
     exit_reason = "completed"
     new_count = 0
@@ -164,7 +165,7 @@ def run_metasearch(
                     config,
                     output_dir,
                     control_path,
-                    keyboard,
+                    keyboard_control,
                     run_id,
                     max_new,
                     existing_ids,
@@ -182,7 +183,7 @@ def run_metasearch(
                     config,
                     output_dir,
                     control_path,
-                    keyboard,
+                    keyboard_control,
                     run_id,
                     max_new,
                     existing_ids,
@@ -191,7 +192,8 @@ def run_metasearch(
                     log_path,
                 )
     finally:
-        keyboard.stop()
+        if keyboard_enabled:
+            keyboard.stop()
 
     all_rows = repo.list_records(conn, run_id)
     all_records = []
@@ -235,7 +237,7 @@ def _run_sequential_providers(
     config: dict[str, str],
     output_dir: Path,
     control_path: Path,
-    keyboard: KeyboardControl,
+    keyboard: KeyboardControl | None,
     run_id: int,
     max_new: int | None,
     existing_ids: set[str],
@@ -392,7 +394,7 @@ def _run_parallel_providers(
     config: dict[str, str],
     output_dir: Path,
     control_path: Path,
-    keyboard: KeyboardControl,
+    keyboard: KeyboardControl | None,
     run_id: int,
     max_new: int | None,
     existing_ids: set[str],
@@ -564,7 +566,7 @@ def _export_duplicates(
     logs_dir.mkdir(parents=True, exist_ok=True)
     timestamp = now_iso().replace(":", "").replace("+", "")
     path = logs_dir / f"duplicates_{timestamp}.csv"
-    with path.open("w", encoding="latin1", newline="") as handle:
+    with path.open("w", encoding="utf-8-sig", newline="") as handle:
         writer = csv.writer(handle, quoting=csv.QUOTE_ALL)
         writer.writerow(["DuplicateTitle", "DuplicateID", "CanonicalTitle", "CanonicalID", "Reason"])
         for duplicate, canonical, reason in duplicates:

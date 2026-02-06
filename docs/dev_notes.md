@@ -24,5 +24,5 @@
 
 ## Known limitations
 - SSRN adapter is not implemented unless authorized access is provided.
-- Pause/resume uses a control file instead of keyboard hooks.
+- Pause/resume uses a control file as the primary method; keyboard controls are best-effort when a TTY is available.
 - Provider-specific filters are best-effort and may be ignored by some APIs.

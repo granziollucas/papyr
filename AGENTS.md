@@ -140,7 +140,7 @@ D) Run folder layout (in the user-provided output directory):
 
 &nbsp; - search\_params.json               (or .toml; pick one and keep stable)
 
-&nbsp; - results.csv                      (comma-separated, latin1 encoding for Excel friendliness)
+&nbsp; - results.csv                      (comma-separated, UTF-8 BOM encoding for Excel friendliness)
 
 &nbsp; - results.ris                      (optional if user runs export)
 
@@ -178,7 +178,7 @@ E) Runtime control during search (cross-platform):
 
 \- While running: show a progress bar with ETA and brief status.
 
-\- Print keyboard commands (or minimal key controls) for:
+\- Print keyboard commands (or minimal key controls) when available for:
 
 &nbsp; - Pause
 
@@ -196,7 +196,7 @@ E) Runtime control during search (cross-platform):
 
 
 
-If true keyboard capture is not robust on some OS, implement a safe fallback:
+If keyboard capture is not robust on some OS, implement a safe fallback:
 
 \- Poll for a “control file” (e.g., .papyr\_control) in the run folder with commands: PAUSE/RESUME/STOP.
 
@@ -240,7 +240,7 @@ Sources in v1:
 
 \- arXiv (mandatory)
 
-\- SSRN (mandatory), BUT:
+\- SSRN (optional; disabled by default), BUT:
 
 &nbsp; - Prefer official API if available.
 
@@ -338,7 +338,7 @@ Encoding \& delimiter:
 
 \- Comma-separated (",")
 
-\- latin1 encoding (for Excel friendliness)
+\- UTF-8 BOM encoding (for Excel friendliness)
 
 \- Ensure proper escaping/quoting for commas and newlines.
 
