@@ -354,7 +354,7 @@ def _run_resume_edit_steps(
         "limit_removed": False,
     }
     limit_prompt = (
-        f\"Result limit (optional). Leave blank to skip new search; type 0 to remove limit; current: {query.limit or ''}\"
+        f"Result limit (optional). Leave blank to skip new search; type 0 to remove limit; current: {query.limit or ''}"
     )
     steps = [
         ("keywords", lambda: _prompt_text("Keywords", values["keywords"])),

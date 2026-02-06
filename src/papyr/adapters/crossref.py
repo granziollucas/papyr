@@ -7,6 +7,7 @@ from typing import Iterable
 
 import requests
 
+from papyr import __version__
 from papyr.adapters.base import Provider
 from papyr.core.models import PaperRecord, ProviderState, RateLimitPolicy, RawRecord, SearchQuery
 from papyr.core.rate_limit import RateLimiter
@@ -33,6 +34,44 @@ class CrossrefProvider(Provider):
         return RateLimitPolicy(min_delay_seconds=1.0)
 
     def search(self, query: SearchQuery, state: ProviderState) -> Iterable[RawRecord]:
+        def _parse_interval_seconds(value: str) -> float | None:
+            value = value.strip()
+            if not value:
+                return None
+            unit = value[-1]
+            if unit.isalpha():
+                number = value[:-1]
+            else:
+                number = value
+                unit = "s"
+            try:
+                amount = float(number)
+            except ValueError:
+                return None
+            if unit == "s":
+                return amount
+            if unit == "m":
+                return amount * 60.0
+            if unit == "h":
+                return amount * 3600.0
+            return None
+
+        def _apply_rate_limit_headers(headers: dict[str, str], limiter: RateLimiter) -> None:
+            limit_value = headers.get("x-rate-limit-limit")
+            interval_value = headers.get("x-rate-limit-interval")
+            if not limit_value or not interval_value:
+                return
+            try:
+                limit = int(limit_value)
+            except ValueError:
+                return
+            interval_seconds = _parse_interval_seconds(interval_value)
+            if not interval_seconds or limit <= 0:
+                return
+            per_request = interval_seconds / float(limit)
+            if per_request > limiter._policy.min_delay_seconds:  # noqa: SLF001
+                limiter._policy.min_delay_seconds = per_request  # noqa: SLF001
+
         cursor = state.cursor or "*"
         remaining = query.limit
         limiter = RateLimiter(self.rate_limit_policy())
@@ -62,15 +101,34 @@ class CrossrefProvider(Provider):
             limiter.wait()
             headers = {}
             user_agent = query.extra.get("crossref_user_agent") if hasattr(query, "extra") else None
+            if email and not user_agent:
+                user_agent = f"Papyr/{__version__} (mailto:{email})"
+            elif email and user_agent and "mailto:" not in user_agent:
+                user_agent = f"{user_agent} (mailto:{email})"
             if user_agent:
                 headers["User-Agent"] = user_agent
-            resp = requests.get(
-                "https://api.crossref.org/works",
-                params=params,
-                headers=headers,
-                timeout=30,
-            )
+            backoff = 1.0
+            while True:
+                resp = requests.get(
+                    "https://api.crossref.org/v1/works",
+                    params=params,
+                    headers=headers,
+                    timeout=30,
+                )
+                if resp.status_code != 429:
+                    break
+                retry_after = resp.headers.get("Retry-After")
+                if retry_after:
+                    try:
+                        delay = float(retry_after)
+                    except ValueError:
+                        delay = backoff
+                else:
+                    delay = backoff
+                time.sleep(delay)
+                backoff = min(backoff * 2.0, 60.0)
             resp.raise_for_status()
+            _apply_rate_limit_headers(resp.headers, limiter)
             payload = resp.json().get("message", {})
             items = payload.get("items", [])
             for item in items:
@@ -85,6 +143,8 @@ class CrossrefProvider(Provider):
                 cursor = next_cursor
                 state.cursor = cursor
             state.last_request_time = time.time()
+            if len(items) < rows:
+                break
             if not items or not next_cursor:
                 break
             if remaining is not None and remaining <= 0:

@@ -18,6 +18,8 @@
 - Switch bootstrap to a short `new`/`resume` hint and rely on step-by-step prompts.
 - Log provider failures to JSONL and keep runs alive after HTTP errors.
 - Quote all CSV fields to avoid comma/newline breakage in Excel and other parsers.
+- Fix `SyntaxError` in wizard resume limit prompt string.
+- Update Crossref adapter to use versioned endpoint, polite User-Agent defaults, 429 backoff, and cursor stop rule.
 
 ## 1.0.0 - 2026-01-22
 - Initial CLI with wizard-driven setup and search.
