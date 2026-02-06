@@ -21,12 +21,17 @@ def _sheet_name_for_origin(origin: str) -> str:
 
 
 def _ensure_header(sheet) -> None:
-    if sheet.max_row == 1 and sheet.max_column == 1 and sheet.cell(row=1, column=1).value is None:
-        sheet.append(CSV_COLUMNS)
+    expected = CSV_COLUMNS
+    first_values = [sheet.cell(row=1, column=idx + 1).value for idx in range(len(expected))]
+    extra_cells = sheet[1][len(expected):]
+    has_extra = any(cell.value is not None for cell in extra_cells)
+    is_empty = all(value is None for value in first_values) and not has_extra
+    if first_values == expected and not has_extra:
         return
-    first_row = [cell.value for cell in sheet[1]]
-    if first_row != CSV_COLUMNS:
-        return
+    if not is_empty:
+        sheet.insert_rows(1)
+    for idx, value in enumerate(expected, start=1):
+        sheet.cell(row=1, column=idx).value = value
 
 
 def export_xlsx(records: list[PaperRecord], path: Path, append: bool = False) -> None:
