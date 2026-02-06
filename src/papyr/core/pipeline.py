@@ -310,6 +310,13 @@ def _run_sequential_providers(
                 if query.download_pdfs and not query.dry_run:
                     urls = provider.get_official_urls(record)
                     pdf_url = urls.get("pdf_url") if urls else None
+                    if not pdf_url:
+                        if provider.name.lower() == "crossref":
+                            logger.debug(
+                                "Crossref: no OA PDF link for record %s",
+                                record.id or record.url or "unknown",
+                            )
+                        continue
                     if pdf_url:
                         filename = safe_filename(record.title, record.id or record.url)
                         dest = output_dir / "files" / filename

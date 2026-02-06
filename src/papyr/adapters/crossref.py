@@ -33,6 +33,46 @@ class CrossrefProvider(Provider):
     def rate_limit_policy(self) -> RateLimitPolicy:
         return RateLimitPolicy(min_delay_seconds=1.0)
 
+    def _select_pdf_link(self, data: dict[str, object]) -> str:
+        links = data.get("link", []) or []
+        best_url = ""
+        best_score = 10
+        for link in links:
+            if not isinstance(link, dict):
+                continue
+            url = link.get("URL") or link.get("url")
+            if not url:
+                continue
+            content_type = str(link.get("content-type", "")).lower()
+            if "pdf" not in content_type:
+                continue
+            intended = str(link.get("intended-application", "")).lower()
+            score = 0 if intended == "text-mining" else 1
+            if score < best_score:
+                best_score = score
+                best_url = str(url)
+        if best_url:
+            return best_url
+        resource = data.get("resource", {}) or {}
+        if isinstance(resource, dict):
+            primary = resource.get("primary", {}) or {}
+            if isinstance(primary, dict):
+                url = primary.get("URL") or primary.get("url")
+                if isinstance(url, str) and url.lower().endswith(".pdf"):
+                    return url
+        return ""
+
+    def _extract_license(self, data: dict[str, object]) -> str:
+        licenses = data.get("license", []) or []
+        if not isinstance(licenses, list) or not licenses:
+            return ""
+        first = licenses[0]
+        if isinstance(first, dict):
+            url = first.get("URL") or first.get("url")
+            if isinstance(url, str):
+                return url
+        return ""
+
     def search(self, query: SearchQuery, state: ProviderState) -> Iterable[RawRecord]:
         def _parse_interval_seconds(value: str) -> float | None:
             value = value.strip()
@@ -172,6 +212,9 @@ class CrossrefProvider(Provider):
         year = ""
         if data.get("issued") and data["issued"].get("date-parts"):
             year = str(data["issued"]["date-parts"][0][0])
+        license_url = self._extract_license(data)
+        pdf_url = self._select_pdf_link(data)
+        oa = "true" if license_url or pdf_url else "unknown"
         record = PaperRecord(
             authors="; ".join(authors),
             title=title,
@@ -181,9 +224,13 @@ class CrossrefProvider(Provider):
             year=year,
             id=doi or isbn,
             url=f"https://doi.org/{doi}" if doi else data.get("URL", ""),
+            license=license_url,
+            oa=oa,
             retrieved_at=now_iso(),
+            pdf_url=pdf_url,
         )
         return record
 
     def get_official_urls(self, record: PaperRecord) -> dict[str, str | None]:
-        return {"landing_url": record.url, "pdf_url": None}
+        pdf_url = record.pdf_url or None
+        return {"landing_url": record.url, "pdf_url": pdf_url}

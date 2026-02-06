@@ -24,6 +24,7 @@ Environment keys:
 - Requests the versioned API endpoint (`/v1/works`).
 - Adapts request pacing from rate limit headers and backs off on 429.
 - Stops cursor pagination when returned items are fewer than requested rows.
+- PDF downloads (when enabled) only occur if Crossref provides an official PDF link.
 - If skipped, Crossref is disabled but will be prompted on each new search.
 
 ## arXiv
