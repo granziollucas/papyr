@@ -10,7 +10,18 @@ def test_dedup_title_and_id():
     assert duplicates[0][0] is b
 
 
-def test_dedup_preprint_by_title_and_authors():
+def test_dedup_prefers_crossref_as_canonical():
+    first = PaperRecord(title="Sample", id="10.1/xyz", origin="arXiv")
+    crossref = PaperRecord(title="Sample", id="10.1/xyz", origin="Crossref")
+    duplicates = find_duplicates([first, crossref])
+    assert len(duplicates) == 1
+    duplicate, canonical, reason = duplicates[0]
+    assert duplicate is first
+    assert canonical is crossref
+    assert "crossref" in reason.lower()
+
+
+def test_dedup_requires_title_and_id_match():
     published = PaperRecord(
         title="Deep Learning for Trading",
         authors="Smith, J.; Doe, A.",
@@ -26,5 +37,11 @@ def test_dedup_preprint_by_title_and_authors():
         id="2201.12345",
     )
     duplicates = find_duplicates([published, preprint])
-    assert len(duplicates) == 1
-    assert duplicates[0][0] is preprint
+    assert duplicates == []
+
+
+def test_dedup_ignores_missing_ids():
+    a = PaperRecord(title="Same Title", id="", origin="Crossref")
+    b = PaperRecord(title="Same Title", id="", origin="arXiv")
+    duplicates = find_duplicates([a, b])
+    assert duplicates == []

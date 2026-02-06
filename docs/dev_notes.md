@@ -2,7 +2,7 @@
 
 ## Architecture summary
 - Provider adapters fetch raw records from external sources.
-- Core pipeline normalizes, deduplicates, persists to SQLite, and exports CSV/RIS.
+- Core pipeline normalizes, deduplicates, persists to SQLite, and exports CSV/TSV/RIS.
 - State lives in `state.sqlite` inside the run folder.
 
 ## Key modules
@@ -19,7 +19,7 @@
 
 ## Assumptions
 - SSRN access requires explicit permission and is disabled by default.
-- Requests are sequential and rate-limited; no parallelism.
+- Requests are sequential by default with optional parallel execution.
 - Errors should not crash a run except for invalid output directory or SQLite failures.
 
 ## Known limitations

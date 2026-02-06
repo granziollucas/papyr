@@ -38,8 +38,8 @@ Prompts:
 Tip: type `back` (or `b`) to return to the previous step.
 
 During runs:
-- Keyboard shortcuts: p=pause, r=resume, s=save+exit, q=stop.
-- A `.papyr_control` file in the output folder can pause/resume/stop (fallback).
+- Keyboard shortcuts (when available): p=pause, r=resume, s=save+exit, q=stop.
+- A `.papyr_control` file in the output folder can pause/resume/stop (reliable fallback).
 - A progress bar with ETA shows overall search progress (ETA is most accurate when a limit is set).
 
 ## papyr resume

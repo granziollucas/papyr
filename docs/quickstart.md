@@ -30,6 +30,8 @@ You will be prompted for:
 - Download PDFs (yes/no)
 - Output directory
 - Dry-run (yes/no)
+- Output format (csv/tsv)
+- Parallel providers (yes/no)
 
 ## 3) Resume a search
 ```bash
@@ -57,6 +59,7 @@ papyr export ris
 <output_dir>/
   search_params.json
   results.csv
+  results.tsv
   results.ris
   state.sqlite
   logs/
@@ -66,11 +69,13 @@ papyr export ris
   files/
     <sanitized_title>_<shortid>.pdf
 ```
+Only one of `results.csv` or `results.tsv` is created per run.
 
 ## Pause/resume/stop control
 Create a file named `.papyr_control` in the output directory with one of:
 - `PAUSE`
 - `RESUME`
 - `STOP`
+- `SAVE_EXIT`
 
-Papyr will poll this file during the run.
+Papyr will poll this file during the run. Keyboard shortcuts are available on some systems as a convenience.

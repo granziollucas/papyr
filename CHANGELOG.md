@@ -10,6 +10,9 @@
 - Show running/paused status in the progress line.
 
 ## Unreleased
+- Update dedup logic to only mark duplicates on title+ID match (Crossref canonical preference).
+- Expand README and docs to reflect current CLI options, controls, and output formats.
+- Add export format tests and shared local temp fixture for pytest stability.
 - Align AGENTS contract with UTF-8 BOM exports and optional SSRN adapter.
 - Write duplicates CSV with UTF-8 BOM for consistent encoding.
 - Treat keyboard controls as best-effort only when a TTY is available.

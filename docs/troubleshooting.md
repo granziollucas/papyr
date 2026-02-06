@@ -20,4 +20,7 @@ SSRN is disabled by default. Only enable if you have explicit permission.
 
 ## Control file not working
 - Ensure `.papyr_control` is in the output directory
-- Commands are case-insensitive: PAUSE/RESUME/STOP
+- Commands are case-insensitive: PAUSE/RESUME/STOP/SAVE_EXIT
+
+## Keyboard shortcuts not working
+Keyboard shortcuts are best-effort and may not be available on all platforms. Use the `.papyr_control` file as a reliable fallback.

@@ -1,44 +1,135 @@
 # Papyr
 
-Papyr is a Python CLI that searches academic works across multiple sources and exports a single CSV with official access links. It can optionally download legitimate PDFs when explicitly enabled.
+Papyr is a Python CLI that searches academic works across multiple sources and exports a single CSV (or TSV) with official access links. It can optionally download legitimate PDFs when explicitly enabled.
 
-What it does
-- Searches Crossref, arXiv, and SSRN (SSRN disabled by default).
-- Exports a CSV with a fixed schema and official URLs.
-- Supports resumable and incremental runs via SQLite state.
+## Key Features
+- Searches Crossref and arXiv (SSRN optional and disabled by default).
+- Exports a fixed-schema results file and supports resumable runs via SQLite.
+- Runs as a wizard-driven CLI with minimal console noise and detailed logs.
+- Optional PDF downloads from official, legitimate sources only.
 
-What it does NOT do
+## What Papyr Does NOT Do
 - It does not bypass paywalls or use unauthorized sources.
 - It does not scrape SSRN without explicit permission.
 - It does not use LLM features in v1.
 
-Install
+## Tech Stack
+- Python 3.11+
+- Typer (CLI)
+- Rich (console UI)
+- SQLite (state)
+
+## Prerequisites
+- Python 3.11+
+- Optional: `pip` and a virtual environment manager of your choice
+
+## Install
+Editable install for local development:
+
 ```bash
 pip install -e .
 ```
 
-Quick start
+## Quick Start
 ```bash
 papyr init
 papyr new
 ```
 
-Launcher scripts
+## Launcher Scripts
+Use launchers if you want a simple shell (`papyr>`) for multiple commands:
+
 - Windows: `papyr-setup.bat` installs requirements, then run `papyr.bat`
 - macOS/Linux: `papyr-setup.sh` installs requirements, then run `papyr.sh`
-- Run a launcher with no arguments to enter a simple shell (`papyr>`) and execute multiple commands.
 
-Docs site (MkDocs)
+Example:
+```bash
+papyr.bat
+papyr> init
+papyr> new
+papyr> exit
+```
+
+## Commands
+- `papyr init` initialize credentials and providers
+- `papyr new` start a new search wizard
+- `papyr resume <run folder or search_params.json>` resume a prior search
+- `papyr config show` display current config (secrets redacted)
+- `papyr config init` create a `.env` template
+- `papyr doctor` validate environment and show next steps
+- `papyr reset-cache` reset local cache/state for a run (asks for confirmation)
+- `papyr export ris` export RIS from CSV
+
+## Providers
+### Crossref
+- Requires a contact email for polite requests.
+- Optional User-Agent string.
+
+### arXiv
+- No credentials required.
+
+### SSRN (Disabled by Default)
+- Only enable if you have explicit permission or approved API/feed access.
+
+See `docs/providers.md` for details.
+
+## Output Layout
+```
+<output_dir>/
+  search_params.json
+  results.csv
+  results.tsv
+  results.ris
+  state.sqlite
+  logs/
+    run_<timestamp>.log
+    duplicates_<timestamp>.csv
+    errors_<timestamp>.jsonl
+  files/
+    <sanitized_title>_<shortid>.pdf
+```
+
+Notes:
+- The run creates either `results.csv` or `results.tsv` based on your wizard choice.
+- All results use UTF-8 with BOM (`utf-8-sig`) for Excel friendliness.
+
+## Resumability and Incremental Runs
+- State is stored in `state.sqlite`.
+- You can resume by pointing at the run folder or `search_params.json`.
+- If you increase the limit, Papyr fetches only the delta.
+- Control file (`.papyr_control`) can pause/resume/stop reliably. Keyboard shortcuts are best-effort.
+
+## PDF Download Policy
+Downloads happen ONLY when explicitly enabled in the wizard.
+- Only official, legitimate PDF URLs are used.
+- No paywall bypass or scraping is supported.
+
+## Logs and Errors
+- Console output is minimal.
+- Full DEBUG logs: `logs/run_<timestamp>.log`
+- Structured errors: `logs/errors_<timestamp>.jsonl`
+- Duplicates: `logs/duplicates_<timestamp>.csv`
+
+## Documentation
+Serve docs locally:
 ```bash
 mkdocs serve
 ```
 
-Key commands
-- `papyr init` initialize credentials and providers
-- `papyr new` start a new search
-- `papyr resume` resume a prior search
-- `papyr doctor` check credentials and show a brief guided next-steps list
-- `papyr export ris` export RIS from CSV
+Key docs:
+- `docs/quickstart.md`
+- `docs/cli_reference.md`
+- `docs/providers.md`
+- `docs/data_schema.md`
+- `docs/resumability.md`
+- `docs/troubleshooting.md`
 
-License
+## Testing
+```bash
+pytest -v
+```
+
+Network tests (skipped by default) live under `tests/adapters/`.
+
+## License
 See `LICENSE`.
