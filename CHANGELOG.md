@@ -14,6 +14,7 @@
 - Expand README and docs to reflect current CLI options, controls, and output formats.
 - Add export format tests and shared local temp fixture for pytest stability.
 - Add test/lint tooling to requirements for consistent local runs.
+- Ensure macOS/Linux setup scripts create and use the project venv.
 - Align AGENTS contract with UTF-8 BOM exports and optional SSRN adapter.
 - Write duplicates CSV with UTF-8 BOM for consistent encoding.
 - Treat keyboard controls as best-effort only when a TTY is available.
